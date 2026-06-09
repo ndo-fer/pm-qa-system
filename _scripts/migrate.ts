@@ -14,6 +14,41 @@ function readExcel(sheet: string) {
   return XLSX.utils.sheet_to_json(ws, { defval: "" }) as Record<string, any>[];
 }
 
+function excelDateToDate(serial: any): Date {
+  if (serial instanceof Date) return serial;
+  if (typeof serial === "string") {
+    if (/^\d{4}-\d{2}-\d{2}/.test(serial)) {
+      return new Date(serial);
+    }
+    const num = parseFloat(serial);
+    if (isNaN(num)) return new Date(serial);
+    serial = num;
+  }
+  if (typeof serial === "number") {
+    const utc_days = Math.floor(serial - 25569);
+    const utc_value = utc_days * 86400;
+    const date_info = new Date(utc_value * 1000);
+    const fractional_day = serial - Math.floor(serial) + 0.0000001;
+    const total_seconds = Math.floor(86400 * fractional_day);
+    return new Date(date_info.getFullYear(), date_info.getMonth(), date_info.getDate(), 0, 0, total_seconds);
+  }
+  return new Date();
+}
+
+function excelDateToString(serial: any): string {
+  if (!serial) return "";
+  try {
+    const d = excelDateToDate(serial);
+    const year = d.getFullYear();
+    const month = String(d.getMonth() + 1).padStart(2, "0");
+    const day = String(d.getDate()).padStart(2, "0");
+    return `${year}-${month}-${day}`;
+  } catch (e) {
+    return String(serial);
+  }
+}
+
+
 const STATUS_MAP: Record<string, string> = {
   Active: "pending",
   Pass: "pass",
@@ -41,7 +76,22 @@ async function migrate() {
 
   if (existing.length > 0) {
     projectId = existing[0].id;
-    console.log(`[SKIP] Project 'ERP Migration' exists (id=${projectId})`);
+    console.log(`[CLEAN] Project 'ERP Migration' exists (id=${projectId}). Clearing old data...`);
+    
+    // Get all test plans under this project
+    const plans = await db.select().from(testPlans).where(eq(testPlans.projectId, projectId));
+    for (const plan of plans) {
+      // Delete test cases under this plan
+      await db.delete(testCases).where(eq(testCases.testPlanId, plan.id));
+    }
+    // Delete plans
+    await db.delete(testPlans).where(eq(testPlans.projectId, projectId));
+    // Delete tasks
+    await db.delete(tasks).where(eq(tasks.projectId, projectId));
+    // Delete milestones
+    await db.delete(milestones).where(eq(milestones.projectId, projectId));
+    
+    console.log("  ✓ Old data cleared successfully.");
   } else {
     projectId = randomUUID();
     await db.insert(projects).values({
@@ -69,8 +119,8 @@ async function migrate() {
     const name = String(row["Milestone"] || "").trim();
     if (!phase || !name || name === "NaN") continue;
 
-    const startDate = row["Start Date"] ? String(row["Start Date"]).split("T")[0] : null;
-    const endDate = row["End Date"] ? String(row["End Date"]).split("T")[0] : null;
+    const startDate = row["Start Date"] ? excelDateToString(row["Start Date"]) : null;
+    const endDate = row["End Date"] ? excelDateToString(row["End Date"]) : null;
 
     await db.insert(milestones).values({
       id: randomUUID(),
@@ -93,8 +143,8 @@ async function migrate() {
   const sCurveRows = readExcel("S-Curve Data");
   const sCurvePlanned = sCurveRows.map((r) => ({
     week: r["Week"],
-    weekStart: r["Week Start"],
-    weekEnd: r["Week End"],
+    weekStart: r["Week Start"] ? excelDateToString(r["Week Start"]) : "",
+    weekEnd: r["Week End"] ? excelDateToString(r["Week End"]) : "",
     plannedCumulative: r["Planned Cumulative %"],
     targetMilestone: r["Target Milestone"],
   }));
