@@ -281,22 +281,6 @@ Berikut adalah daftar pengguna bawaan hasil seeding database untuk pengujian sis
 
 </details>
 
-<details>
-<summary><b>👑 Matriks Peran Pengujian ERP Staging</b></summary>
-
-Untuk pengujian modul pada sistem ERP target (Staging URL: `https://erp.padajaya.biz.id`), QA menggunakan akun kredensial matriks berikut:
-
-1.  👑 **Administrator** (Full permissions):
-    *   **Username:** `PDJService`
-    *   **Password:** `pdj123`
-2.  ⭐ **Top User** (Managerial/Approval permissions):
-    *   **Username:** `K009`
-    *   **Password:** `123456`
-3.  👤 **Standard User** (Transactional/Operator permissions):
-    *   **Username:** `K010`
-    *   **Password:** `12345`
-
-</details>
 
 <details>
 <summary><b>🛠️ Skrip Manajemen & Otomasi QA</b></summary>
@@ -329,48 +313,6 @@ python _scripts/test_erp_portal.py --role topuser --headless
 
 # Menjalankan pengujian staging sebagai Standard User
 python _scripts/test_erp_portal.py --role user
-```
-
-</details>
-
-<details>
-<summary><b>☁️ Petunjuk Deployment Produksi (Supabase & Vercel)</b></summary>
-
-Sistem ini sepenuhnya mendukung deployment cloud ke **Vercel** dengan basis data **Supabase PostgreSQL**.
-
-### 1. Konfigurasi Environment Variables di Vercel
-
-Tambahkan variabel-variabel berikut di dashboard Vercel Anda (**Settings > Environment Variables**):
-
-| Key | Contoh Nilai | Deskripsi |
-| :--- | :--- | :--- |
-| `DATABASE_URL` | `postgresql://postgres.[REF]:[PASS]@[HOST]:6543/postgres?pgbouncer=true` | Koneksi database PostgreSQL Supabase. **Catatan:** Gunakan host Transaction Pooler (port `6543`) dan tambahkan query parameter `?pgbouncer=true` demi kestabilan koneksi serverless. |
-| `NEXTAUTH_SECRET` | `secret-key-acak-minimal-32-karakter` | Kunci enkripsi session JWT NextAuth. |
-| `NEXTAUTH_URL` | `https://pm-qa-system.vercel.app` | URL domain Vercel Anda. |
-| `GOOGLE_SERVICE_ACCOUNT_EMAIL` | `service-account@project.iam.gserviceaccount.com` | Surel Google Service Account. |
-| `GOOGLE_PRIVATE_KEY` | `-----BEGIN PRIVATE KEY-----\n...\n-----END PRIVATE KEY-----` | Google Sheets API Private Key. |
-| `GOOGLE_SPREADSHEET_ID` | `1xyz...abc` | ID Google Spreadsheet untuk sinkronisasi QA. |
-
-> [!IMPORTANT]
-> Pastikan saat memasukkan nilai variabel di Vercel **tidak menggunakan** tanda kutip (`"` atau `'`).
-
-### 2. Jalankan Migrasi & Sinkronisasi ke Supabase
-
-Jalankan perintah ini di komputer lokal Anda (pastikan file `.env.local` sudah dikonfigurasi ke database Supabase Cloud target):
-
-```bash
-# 1. Jalankan migrasi schema ke database Supabase
-npx drizzle-kit push
-
-# 2. Impor data workbook Excel ke database Supabase
-npx tsx _scripts/migrate.ts
-
-# 3. Lakukan seeding data user bawaan & test case QA matrix
-npm run db:seed
-
-# 4. Sinkronisasikan kemajuan task & QA test case dari SQLite lokal ke database cloud
-npx tsx scratch/sync_sqlite_to_supabase.ts
-npx tsx scratch/copy_missing_tasks.ts
 ```
 
 </details>
