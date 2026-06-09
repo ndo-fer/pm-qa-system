@@ -39,3 +39,19 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# SQLite Database
+*.db
+*.db-journal
+*.sqlite
+
+# Google service account secrets
+*sync*.json
+
+# Excel workbooks
+/*.xlsx
+
+# Development scratch files and build artifacts
+/scratch/
+/scratch/multi_project_planning.md
+/artifacts/
