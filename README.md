@@ -7,7 +7,8 @@ Sistem Manajemen Proyek ERP berbasis web yang dirancang khusus untuk mengelola s
 
 ---
 
-## 🚀 Tech Stack
+<details>
+<summary><b>🚀 Tech Stack</b></summary>
 
 | Kategori | Teknologi | Deskripsi |
 | :--- | :--- | :--- |
@@ -23,9 +24,10 @@ Sistem Manajemen Proyek ERP berbasis web yang dirancang khusus untuk mengelola s
 | **Integration** | Google Sheets API v4 | Sinkronisasi dua arah real-time untuk data Tasks & QA |
 | **Automation** | Python, Selenium WebDriver (Edge) | Pengujian E2E otomatis pada sistem lokal & portal staging |
 
----
+</details>
 
-## ✨ Fitur Utama
+<details>
+<summary><b>✨ Fitur Utama</b></summary>
 
 ### 1. Multi-Role Authentication & Access Control
 Sistem mengimplementasikan otentikasi berbasis NextAuth dengan pembagian peran yang ketat:
@@ -51,9 +53,10 @@ Integrasi dua arah yang memastikan keselarasan data lokal dengan lembar laporan 
 *   **Bidirectional Sync**: Perubahan status tugas atau hasil tes di Google Sheets dapat diimpor langsung ke database SQLite lokal, begitu pula sebaliknya.
 *   **S-Curve Engine**: Menghitung secara dinamis bobot rencana kemajuan mingguan (Planned Cumulative %) dibanding kemajuan nyata pengembang di lapangan (Actual Cumulative %) untuk mendeteksi deviasi jadwal proyek.
 
----
+</details>
 
-## 📊 Struktur Database (Drizzle Schema)
+<details>
+<summary><b>📊 Struktur Database (Drizzle Schema)</b></summary>
 
 Database SQLite dikelola menggunakan **Drizzle ORM** dengan relasi sebagai berikut:
 
@@ -156,9 +159,10 @@ erDiagram
     }
 ```
 
----
+</details>
 
-## 📁 Struktur Proyek
+<details>
+<summary><b>📁 Struktur Proyek</b></summary>
 
 ```
 erp-pm-system/
@@ -197,9 +201,10 @@ erp-pm-system/
 └── README.md                  # Dokumentasi teknis proyek
 ```
 
----
+</details>
 
-## ⚙️ Petunjuk Penginstalan & Penggunaan
+<details>
+<summary><b>⚙️ Petunjuk Penginstalan & Penggunaan</b></summary>
 
 ### 1. Prasyarat Sistem
 *   **Node.js**: Versi `20.x` ke atas (Direkomendasikan Node LTS).
@@ -256,9 +261,10 @@ npm run dev
 ```
 Buka peramban (browser) Anda dan akses halaman `http://localhost:3000`.
 
----
+</details>
 
-## 👥 Akun Akses Sistem (Kredensial Default)
+<details>
+<summary><b>👥 Akun Akses Sistem (Kredensial Default)</b></summary>
 
 Berikut adalah daftar pengguna bawaan hasil seeding database untuk pengujian sistem PM lokal:
 
@@ -273,9 +279,10 @@ Berikut adalah daftar pengguna bawaan hasil seeding database untuk pengujian sis
 | **Developer** | Halim (Sales & AR) | `halim@erp.local` | `dev123` |
 | **Developer** | Akbar (API & System Config) | `akbar@erp.local` | `dev123` |
 
----
+</details>
 
-## 👑 Matriks Peran Pengujian ERP Staging
+<details>
+<summary><b>👑 Matriks Peran Pengujian ERP Staging</b></summary>
 
 Untuk pengujian modul pada sistem ERP target (Staging URL: `https://erp.padajaya.biz.id`), QA menggunakan akun kredensial matriks berikut:
 
@@ -289,9 +296,10 @@ Untuk pengujian modul pada sistem ERP target (Staging URL: `https://erp.padajaya
     *   **Username:** `K010`
     *   **Password:** `12345`
 
----
+</details>
 
-## 🛠️ Skrip Manajemen & Otomasi QA
+<details>
+<summary><b>🛠️ Skrip Manajemen & Otomasi QA</b></summary>
 
 Sistem menyediakan rangkaian skrip otomatisasi yang dapat dieksekusi melalui terminal:
 
@@ -323,9 +331,10 @@ python _scripts/test_erp_portal.py --role topuser --headless
 python _scripts/test_erp_portal.py --role user
 ```
 
----
+</details>
 
-## ☁️ Petunjuk Deployment Produksi (Supabase & Vercel)
+<details>
+<summary><b>☁️ Petunjuk Deployment Produksi (Supabase & Vercel)</b></summary>
 
 Sistem ini sepenuhnya mendukung deployment cloud ke **Vercel** dengan basis data **Supabase PostgreSQL**.
 
@@ -363,6 +372,8 @@ npm run db:seed
 npx tsx scratch/sync_sqlite_to_supabase.ts
 npx tsx scratch/copy_missing_tasks.ts
 ```
+
+</details>
 
 ---
 
