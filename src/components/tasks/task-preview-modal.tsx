@@ -123,7 +123,7 @@ export function TaskPreviewModal({
             )}
             {task.epic && (
               <Badge variant="outline" className="text-xs uppercase font-extrabold px-2.5 py-0.5 bg-blue-50 text-blue-700 border-blue-200">
-                Epic: {task.epic}
+                Modul: {task.epic}
               </Badge>
             )}
             <Badge className={`text-xs uppercase font-extrabold px-2.5 py-0.5 ${statusColors[task.status] || "bg-slate-100 text-slate-800"}`}>

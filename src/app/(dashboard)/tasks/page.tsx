@@ -21,6 +21,14 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { TaskForm } from "@/components/tasks/task-form";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { KanbanBoard } from "@/components/tasks/kanban-board";
 import { TaskPreviewModal } from "@/components/tasks/task-preview-modal";
 import { Plus, Pencil, Trash2, LayoutGrid, List, RefreshCw, HardDrive, Archive } from "lucide-react";
@@ -96,8 +104,6 @@ const priorityLabels: Record<string, string> = {
   urgent: "Urgent",
 };
 
-const epics = ["MST", "INV", "PUR", "SLS", "PRD", "AP", "AR", "FIN", "GL", "RPT", "ADM"];
-
 export default function TasksPage() {
   const { data: session } = useSession();
   const [tasks, setTasks] = useState<Task[]>([]);
@@ -106,11 +112,19 @@ export default function TasksPage() {
   const [milestoneList, setMilestoneList] = useState<Milestone[]>([]);
   const [loading, setLoading] = useState(true);
 
+  const [modules, setModules] = useState<string[]>([
+    "MST", "INV", "PUR", "SLS", "PRD", "AP", "AR", "FIN", "GL", "RPT", "ADM"
+  ]);
+
   const [formOpen, setFormOpen] = useState(false);
   const [editingTask, setEditingTask] = useState<Task | null>(null);
   const [filterStatus, setFilterStatus] = useState("");
   const [filterPriority, setFilterPriority] = useState("");
   const [filterEpic, setFilterEpic] = useState("");
+
+  const [addModuleOpen, setAddModuleOpen] = useState(false);
+  const [newModuleName, setNewModuleName] = useState("");
+  const [addModuleError, setAddModuleError] = useState("");
   const [filterPhase, setFilterPhase] = useState("");
   const [filterErpRole, setFilterErpRole] = useState("");
   const [filterAssignee, setFilterAssignee] = useState("");
@@ -222,6 +236,7 @@ export default function TasksPage() {
     fetchData();
   }, [filterErpRole]);
 
+  // Database data is fetched scoping to the selected project
   async function handleDelete(id: string) {
     if (!confirm("Delete this task?")) return;
     await fetch(`/api/tasks/${id}`, { method: "DELETE" });
@@ -277,17 +292,16 @@ export default function TasksPage() {
 
   const getUserName = (userId: string | null) => users.find((u) => u.id === userId)?.name || "Unassigned";
 
-  // Summary by epic — only count non-archived tasks so chip numbers match the board
-  const epicSummary = epics.map((epic) => {
-    const epicTasks = tasks.filter((t) => {
+  // Summary by module — only count non-archived tasks so chip numbers match the board
+  const moduleSummary = modules.map((mod) => {
+    const moduleTasks = tasks.filter((t) => {
       const archived = (t as any).isArchived === 1 || (t as any).isArchived === true;
-      return t.epic === epic && !archived;
+      return t.epic === mod && !archived;
     });
-    if (epicTasks.length === 0) return null;
-    const done = epicTasks.filter((t) => t.status === "done").length;
-    const inProgress = epicTasks.filter((t) => t.status === "in_progress").length;
-    return { epic, total: epicTasks.length, done, inProgress, todo: epicTasks.length - done - inProgress };
-  }).filter(Boolean);
+    const done = moduleTasks.filter((t) => t.status === "done").length;
+    const inProgress = moduleTasks.filter((t) => t.status === "in_progress").length;
+    return { name: mod, total: moduleTasks.length, done, inProgress, todo: moduleTasks.length - done - inProgress };
+  });
 
   return (
     <AppLayout className="px-4 py-2.5 h-full flex flex-col overflow-hidden">
@@ -359,38 +373,67 @@ export default function TasksPage() {
           </div>
         </div>
 
-        {/* Epic Summary */}
-        <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-11 gap-1 flex-shrink-0">
-          {epicSummary.map((s: any) => (
+        {/* Module Summary */}
+        <div className="flex flex-row gap-2 overflow-x-auto pb-2 flex-nowrap flex-shrink-0 scrollbar-thin select-none">
+          {moduleSummary.map((s: any) => (
             <button
-              key={s.epic}
+              key={s.name}
               onClick={() => {
-                if (filterEpic === s.epic) {
+                if (filterEpic === s.name) {
                   // deselect
                   setFilterEpic("");
                 } else {
                   // select epic and clear conflicting filters
-                  setFilterEpic(s.epic);
+                  setFilterEpic(s.name);
                   setFilterPhase("");
                   setFilterStatus("");
                   setFilterPriority("");
                 }
               }}
-              className={`py-1 px-1.5 rounded border text-center transition-all flex flex-col items-center justify-center ${
-                filterEpic === s.epic 
-                  ? "bg-blue-600 border-blue-600 text-white font-bold shadow-sm" 
-                  : "bg-white border-slate-200 text-slate-700 hover:bg-slate-50 hover:border-slate-300"
+              className={`h-14 w-28 flex-shrink-0 rounded-xl border text-left px-3 py-2 transition-all flex flex-col justify-between ${
+                filterEpic === s.name 
+                  ? "bg-blue-600 border-blue-600 text-white font-bold shadow-md shadow-blue-500/25 scale-[1.01]" 
+                  : "bg-white border-slate-200 text-slate-700 hover:bg-slate-50 hover:border-slate-350"
               }`}
             >
-              <div className="flex items-baseline gap-1">
-                <span className="text-[10px] uppercase font-bold tracking-wider">{s.epic}</span>
-                <span className="text-xs font-black">{s.total}</span>
+              <div className="flex items-center justify-between w-full">
+                <span className="text-[10px] uppercase font-black tracking-wider truncate mr-1" title={s.name}>{s.name}</span>
+                <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${
+                  filterEpic === s.name 
+                    ? "bg-blue-700 text-white" 
+                    : "bg-slate-100 text-slate-650"
+                }`}>
+                  {s.total}
+                </span>
               </div>
-              <span className={`text-[8.5px] font-medium leading-none ${filterEpic === s.epic ? "text-blue-100" : "text-slate-500"}`}>
-                {s.done}/{s.total} done
-              </span>
+              <div className="flex items-center justify-between w-full">
+                <span className={`text-[9px] font-semibold leading-none ${filterEpic === s.name ? "text-blue-100" : "text-slate-500"}`}>
+                  {s.done}/{s.total} done
+                </span>
+                {/* Micro progress line */}
+                <div className={`w-8 rounded-full h-1 overflow-hidden ${
+                  filterEpic === s.name ? "bg-blue-700/80" : "bg-slate-100"
+                }`}>
+                  <div 
+                    className={`h-1 rounded-full ${filterEpic === s.name ? "bg-white" : "bg-blue-600"}`}
+                    style={{ width: `${s.total > 0 ? (s.done / s.total) * 100 : 0}%` }}
+                  />
+                </div>
+              </div>
             </button>
           ))}
+          {/* Add Module Button */}
+          <button
+            onClick={() => {
+              setAddModuleError("");
+              setNewModuleName("");
+              setAddModuleOpen(true);
+            }}
+            className="h-14 w-28 flex-shrink-0 rounded-xl border border-dashed border-slate-300 bg-slate-50/50 text-slate-500 hover:bg-slate-100 hover:text-slate-700 transition-all flex flex-col items-center justify-center gap-1 font-bold text-xs"
+          >
+            <Plus className="w-3.5 h-3.5" />
+            <span>+ Modul</span>
+          </button>
         </div>
 
         {/* Filters */}
@@ -518,7 +561,7 @@ export default function TasksPage() {
                 <TableHeader className="sticky top-0 bg-white z-10">
                   <TableRow>
                     <TableHead className="w-28">ID</TableHead>
-                    <TableHead>Epic</TableHead>
+                    <TableHead>Modul</TableHead>
                     <TableHead>Title</TableHead>
                     <TableHead>Status</TableHead>
                     <TableHead>Priority</TableHead>
@@ -602,6 +645,8 @@ export default function TasksPage() {
         projects={projects}
         users={users}
         onSuccess={fetchData}
+        modules={modules}
+        defaultEpic={filterEpic}
       />
 
       <TaskPreviewModal
@@ -615,6 +660,55 @@ export default function TasksPage() {
           setFormOpen(true);
         }}
       />
+
+      <Dialog open={addModuleOpen} onOpenChange={setAddModuleOpen}>
+        <DialogContent className="sm:max-w-[400px]">
+          <DialogHeader>
+            <DialogTitle>Tambah Modul Baru</DialogTitle>
+            <DialogDescription>
+              Masukkan kode modul baru (misalnya: TAX, HRD). Kode harus unik dan singkat.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="py-4 space-y-2">
+            <Input
+              value={newModuleName}
+              onChange={(e) => {
+                setNewModuleName(e.target.value.toUpperCase());
+                setAddModuleError("");
+              }}
+              placeholder="Kode Modul (misal: HRD)"
+              className="h-10 text-sm font-bold uppercase tracking-wider"
+              maxLength={10}
+            />
+            {addModuleError && (
+              <p className="text-xs text-red-650 font-bold">{addModuleError}</p>
+            )}
+          </div>
+          <DialogFooter>
+            <Button variant="outline" type="button" onClick={() => setAddModuleOpen(false)}>Batal</Button>
+            <Button 
+              type="button"
+              onClick={() => {
+                const cleaned = newModuleName.trim().toUpperCase();
+                if (cleaned) {
+                  if (modules.includes(cleaned)) {
+                    setAddModuleError("Modul sudah ada!");
+                  } else {
+                    setModules((prev) => [...prev, cleaned]);
+                    setAddModuleOpen(false);
+                    setNewModuleName("");
+                    setAddModuleError("");
+                  }
+                } else {
+                  setAddModuleError("Nama modul tidak boleh kosong.");
+                }
+              }}
+            >
+              Tambah
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </AppLayout>
   );
 }

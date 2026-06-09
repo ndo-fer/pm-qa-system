@@ -63,6 +63,8 @@ interface TaskFormProps {
   projects: Project[];
   users: User[];
   onSuccess: () => void;
+  modules?: string[];
+  defaultEpic?: string;
 }
 
 const EPICS = ["MST", "INV", "PUR", "SLS", "PRD", "AP", "AR", "FIN", "GL", "RPT", "ADM"];
@@ -84,7 +86,8 @@ const ERP_ROLES = [
   { value: "user", label: "User" },
 ];
 
-export function TaskForm({ open, onOpenChange, task, projects, users, onSuccess }: TaskFormProps) {
+export function TaskForm({ open, onOpenChange, task, projects, users, onSuccess, modules, defaultEpic }: TaskFormProps) {
+  const activeModules = modules || EPICS;
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [projectId, setProjectId] = useState("");
@@ -155,7 +158,7 @@ export function TaskForm({ open, onOpenChange, task, projects, users, onSuccess 
       setPriority("medium");
       setDueDate("");
       setTaskCode("");
-      setEpic("");
+      setEpic(defaultEpic || "");
       setFeature("");
       setTaskType("");
       setSrdRef("");
@@ -167,7 +170,7 @@ export function TaskForm({ open, onOpenChange, task, projects, users, onSuccess 
       setPhase("");
       setErpRole("all_roles");
     }
-  }, [task, open, projects]);
+  }, [task, open, projects, defaultEpic]);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -358,11 +361,11 @@ export function TaskForm({ open, onOpenChange, task, projects, users, onSuccess 
 
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-1.5">
-                  <label className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Epic / Module</label>
+                  <label className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Modul</label>
                   <Select value={epic} onValueChange={(v) => setEpic(v || "")}>
-                    <SelectTrigger className="w-full h-9 text-sm"><SelectValue placeholder="Select Epic" /></SelectTrigger>
+                    <SelectTrigger className="w-full h-9 text-sm"><SelectValue placeholder="Pilih Modul" /></SelectTrigger>
                     <SelectContent>
-                      {EPICS.map((ep) => (
+                      {activeModules.map((ep) => (
                         <SelectItem key={ep} value={ep}>{ep}</SelectItem>
                       ))}
                     </SelectContent>
