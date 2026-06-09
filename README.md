@@ -5,6 +5,32 @@
 
 Sistem Manajemen Proyek ERP berbasis web yang dirancang khusus untuk mengelola seluruh siklus hidup pengembangan perangkat lunak (SDLC). Mulai dari perencanaan milestone, penugasan tugas pengembang, penelusuran kemajuan secara visual via grafik S-Curve, hingga eksekusi pengujian QA berbasis matriks peran (Role-Based Matrix Testing) dengan sinkronisasi otomatis dua arah ke **Google Sheets**.
 
+## 📸 Preview Aplikasi
+
+<details>
+  <summary><b>1. Halaman Login (Multi-Role Authentication)</b></summary>
+  <br>
+  <img src="./public/screenshots/login.png" alt="Halaman Login" width="100%" />
+</details>
+
+<details>
+  <summary><b>2. Dashboard Utama (S-Curve & Progress Tracking)</b></summary>
+  <br>
+  <img src="./public/screenshots/dashboard.png" alt="Dashboard Utama" width="100%" />
+</details>
+
+<details>
+  <summary><b>3. Kanban Board & Developer Workbook (Tasks Management)</b></summary>
+  <br>
+  <img src="./public/screenshots/kanban.png" alt="Kanban Board & Tasks" width="100%" />
+</details>
+
+<details>
+  <summary><b>4. QA Testing Console (Matrix Testing - QA Role Exclusive)</b></summary>
+  <br>
+  <img src="./public/screenshots/qa.png" alt="QA Testing Console" width="100%" />
+</details>
+
 ---
 
 <details>
