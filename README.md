@@ -1,5 +1,7 @@
 # ERP Project Management System
-> **Magang QA — PT Pacific Data Jaya**
+> **PT Pacific Data Jaya**
+
+🌐 **Live Production Link:** [https://pm-qa-system.vercel.app](https://pm-qa-system.vercel.app)
 
 Sistem Manajemen Proyek ERP berbasis web yang dirancang khusus untuk mengelola seluruh siklus hidup pengembangan perangkat lunak (SDLC). Mulai dari perencanaan milestone, penugasan tugas pengembang, penelusuran kemajuan secara visual via grafik S-Curve, hingga eksekusi pengujian QA berbasis matriks peran (Role-Based Matrix Testing) dengan sinkronisasi otomatis dua arah ke **Google Sheets**.
 
