@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { useSession } from "next-auth/react";
-import { useParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import { AppLayout } from "@/components/layout/app-layout";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -103,6 +103,7 @@ const moduleToEpicMap: Record<string, string> = {
 export default function QAPage() {
   const { data: session } = useSession();
   const params = useParams();
+  const router = useRouter();
   const projectCode = params?.projectCode as string;
 
   const userRole = (session?.user as any)?.role || "user";
@@ -160,6 +161,7 @@ export default function QAPage() {
   const [execStatus, setExecStatus] = useState<string>("pending");
   const [execActualResult, setExecActualResult] = useState("");
   const [execNotes, setExecNotes] = useState("");
+  const [execAttachmentUrl, setExecAttachmentUrl] = useState("");
   const [createDefect, setCreateDefect] = useState(false);
   const [checkedSteps, setCheckedSteps] = useState<Record<number, boolean>>({});
 
@@ -352,6 +354,7 @@ export default function QAPage() {
         status: execStatus,
         actualResult: execActualResult || null,
         notes: execNotes || null,
+        attachmentUrl: execAttachmentUrl || null,
         executedAt: new Date().toISOString(),
       }),
     });
@@ -362,41 +365,33 @@ export default function QAPage() {
     }
 
     // 2. Automated Defect Creation if FAIL/BLOCKED
+    let defectCreated = false;
     if (createDefect && (execStatus === "fail" || execStatus === "blocked")) {
       const selectedPlanData = testPlans.find((p) => p.id === selectedPlan);
       const projectId = selectedPlanData?.projectId || (projects[0]?.id || "");
-      const moduleName = selectedPlanData?.module || "Pemasok";
-      const getEpicForCase = (caseNo: string, modName: string): string => {
-        const cn = caseNo.toUpperCase();
-        if (cn.includes("-MD-") || cn.includes("-MST-")) return "MST";
-        if (cn.includes("-PUR-") || cn.includes("-PEM-")) return "PUR";
-        if (cn.includes("-INV-") || cn.includes("-GD-") || cn.includes("-BRG-")) return "INV";
-        if (cn.includes("-SLS-") || cn.includes("-PEN-") || cn.includes("-PLG-")) return "SLS";
-        if (cn.includes("-FIN-") || cn.includes("-KEU-")) return "FIN";
-        if (cn.includes("-ADM-") || cn.includes("-PENG-") || cn.includes("-SET-")) return "ADM";
-        if (cn.includes("-RPT-") || cn.includes("-KIN-")) return "RPT";
-        return moduleToEpicMap[modName] || "ADM";
-      };
-      const epicCode = getEpicForCase(activeExecCase.caseNumber, moduleName);
       const bugCode = `BUG-QA-${activeExecCase.caseNumber.replace(/[^A-Za-z0-9]/g, "")}`;
 
-      await fetch("/api/tasks", {
+      const bugRes = await fetch("/api/tasks", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           projectId,
           title: `[DEFECT] ${activeExecCase.caseNumber}: ${activeExecCase.description}`,
-          description: `### Test Case Details\n- **Case**: ${activeExecCase.caseNumber}\n- **Scenario**: ${activeExecCase.description}\n\n### Expected Result\n${activeExecCase.expectedResult || "None"}\n\n### Actual Result\n${execActualResult || "No actual result provided"}\n\n### Notes\n${execNotes || "None"}`,
+          description: `### Test Case Details\n- **Case**: ${activeExecCase.caseNumber}\n- **Scenario**: ${activeExecCase.description}\n\n### Expected Result\n${activeExecCase.expectedResult || "None"}\n\n### Actual Result\n${execActualResult || "No actual result provided"}\n\n### Notes\n${execNotes || "None"}` + (execAttachmentUrl ? `\n\n### Attachment\n${execAttachmentUrl}` : ""),
           status: "todo",
           priority: execStatus === "fail" ? "high" : "medium",
           taskCode: bugCode,
-          epic: epicCode,
+          epic: "BUG",
           feature: "Defect",
           progress: 0,
           blocker: execStatus === "blocked" ? "Blocked during QA execution" : null,
           phase: "Phase 1",
+          screenshotUrl: execAttachmentUrl || null,
         }),
       });
+      if (bugRes.ok) {
+        defectCreated = true;
+      }
     }
 
     // Reset and refresh
@@ -404,11 +399,16 @@ export default function QAPage() {
     setExecStatus("pending");
     setExecActualResult("");
     setExecNotes("");
+    setExecAttachmentUrl("");
     setCreateDefect(false);
     setCheckedSteps({});
     setTestError(null);
     setTestSuccess(null);
     fetchData();
+
+    if (defectCreated) {
+      router.push(`/${projectCode}/tasks`);
+    }
   }
 
   // Pre-fill execution modal values when active test case changes
@@ -417,6 +417,7 @@ export default function QAPage() {
     setExecStatus(tc.status);
     setExecActualResult(tc.actualResult || "");
     setExecNotes(tc.notes || "");
+    setExecAttachmentUrl((tc as any).attachmentUrl || "");
     setCreateDefect(false);
     setCheckedSteps({});
     setTestError(null);
@@ -1517,6 +1518,32 @@ export default function QAPage() {
                       Pending
                     </button>
                   </div>
+
+                  {/* Automated Task Tracking Option */}
+                  {(execStatus === "fail" || execStatus === "blocked") && (
+                    isQA ? (
+                      <div className="flex items-center gap-2 p-2.5 bg-red-50/40 border border-red-100 rounded-lg mt-2">
+                        <input
+                          type="checkbox"
+                          id="createDefect"
+                          checked={createDefect}
+                          onChange={(e) => setCreateDefect(e.target.checked)}
+                          className="h-4 w-4 rounded border-slate-300 text-red-650 focus:ring-red-500"
+                        />
+                        <label htmlFor="createDefect" className="text-xs font-semibold text-slate-700 flex items-center gap-1.5 cursor-pointer font-bold">
+                          <Bug className="w-3.5 h-3.5 text-red-600" />
+                          Auto-create defect task
+                        </label>
+                      </div>
+                    ) : (
+                      <div className="flex items-center gap-2 p-2.5 bg-slate-50 border border-slate-200 rounded-lg mt-2">
+                        <Bug className="w-3.5 h-3.5 text-slate-400" />
+                        <span className="text-xs text-slate-500 font-medium">
+                          Auto-defect logging is restricted to the QA role.
+                        </span>
+                      </div>
+                    )
+                  )}
                 </div>
 
                 {/* Inputs: Actual Result & Notes */}
@@ -1540,33 +1567,18 @@ export default function QAPage() {
                       className="w-full h-20 border border-input rounded-lg p-2.5 text-xs focus:ring-blue-500 focus:border-blue-500 outline-none resize-none"
                     />
                   </div>
-                </div>
 
-                {/* Automated Task Tracking Option */}
-                {(execStatus === "fail" || execStatus === "blocked") && (
-                  isQA ? (
-                    <div className="flex items-center gap-2 p-3 bg-red-50/40 border border-red-100 rounded-lg">
-                      <input
-                        type="checkbox"
-                        id="createDefect"
-                        checked={createDefect}
-                        onChange={(e) => setCreateDefect(e.target.checked)}
-                        className="h-4 w-4 rounded border-slate-300 text-red-650 focus:ring-red-500"
-                      />
-                      <label htmlFor="createDefect" className="text-xs font-semibold text-slate-700 flex items-center gap-1.5 cursor-pointer">
-                        <Bug className="w-3.5 h-3.5 text-red-600" />
-                        Auto-create defect task
-                      </label>
-                    </div>
-                  ) : (
-                    <div className="flex items-center gap-2 p-3 bg-slate-50 border border-slate-200 rounded-lg">
-                      <Bug className="w-3.5 h-3.5 text-slate-400" />
-                      <span className="text-xs text-slate-500 font-medium">
-                        Auto-defect logging is restricted to the QA role.
-                      </span>
-                    </div>
-                  )
-                )}
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-bold text-slate-700">Image / Video Link (Url Only)</label>
+                    <input
+                      type="url"
+                      value={execAttachmentUrl}
+                      onChange={(e) => setExecAttachmentUrl(e.target.value)}
+                      placeholder="https://example.com/screenshot.png"
+                      className="w-full border border-input rounded-lg p-2.5 text-xs focus:ring-blue-500 focus:border-blue-500 outline-none"
+                    />
+                  </div>
+                </div>
               </div>
             </div>
           </div>

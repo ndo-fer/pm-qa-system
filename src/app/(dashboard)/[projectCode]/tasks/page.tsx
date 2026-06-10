@@ -117,7 +117,7 @@ export default function TasksPage() {
   const [loading, setLoading] = useState(true);
 
   const [modules, setModules] = useState<string[]>([
-    "MST", "INV", "PUR", "SLS", "PRD", "AP", "AR", "FIN", "GL", "RPT", "ADM"
+    "MST", "INV", "PUR", "SLS", "PRD", "AP", "AR", "FIN", "GL", "RPT", "ADM", "BUG"
   ]);
 
   const [formOpen, setFormOpen] = useState(false);

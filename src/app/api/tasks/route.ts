@@ -85,6 +85,7 @@ export async function POST(request: Request) {
     phase: body.phase || null,
     erpRole: body.erpRole || "all_roles",
     roleSpecificFeatures: body.roleSpecificFeatures || null,
+    screenshotUrl: body.screenshotUrl || null,
   };
 
   const [created] = await db.insert(tasks).values(newTask).returning();

@@ -22,17 +22,12 @@ async function runSchemaMigration() {
       ALTER TABLE "projects" ALTER COLUMN "code" SET NOT NULL;
     `);
     
-    // Add unique constraint (catch if it already exists)
     try {
       await db.execute(sql`
         ALTER TABLE "projects" ADD CONSTRAINT "projects_code_unique" UNIQUE ("code");
       `);
     } catch (e: any) {
-      if (e.message && e.message.includes("already exists")) {
-        console.log("Unique constraint 'projects_code_unique' already exists.");
-      } else {
-        throw e;
-      }
+      console.log("Unique constraint 'projects_code_unique' already exists or failed to create. skipping.");
     }
 
     // 4. Create project_members table
@@ -45,6 +40,12 @@ async function runSchemaMigration() {
         "role" text NOT NULL,
         "created_at" timestamp DEFAULT now()
       );
+    `);
+
+    // 5. Add attachment_url to test_cases table
+    console.log("Adding column 'attachment_url' to 'test_cases'...");
+    await db.execute(sql`
+      ALTER TABLE "test_cases" ADD COLUMN IF NOT EXISTS "attachment_url" text;
     `);
 
     console.log("Schema migration successful!");

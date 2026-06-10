@@ -86,6 +86,7 @@ export const testCases = pgTable("test_cases", {
   erpRole: text("erp_role").$type<"administrator" | "top_user" | "user" | "matrix">(),
   testType: text("test_type").$type<"functional" | "permission" | "workflow" | "matrix">().default("functional"),
   loginCredentials: jsonb("login_credentials"),
+  attachmentUrl: text("attachment_url"),
 });
 
 export const milestones = pgTable("milestones", {

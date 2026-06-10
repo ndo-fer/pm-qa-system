@@ -55,6 +55,7 @@ export async function GET(request: Request) {
       erpRole: testCases.erpRole,
       testType: testCases.testType,
       loginCredentials: testCases.loginCredentials,
+      attachmentUrl: testCases.attachmentUrl,
     })
     .from(testCases)
     .innerJoin(testPlans, eq(testCases.testPlanId, testPlans.id))
@@ -100,6 +101,7 @@ export async function POST(request: Request) {
     erpRole: body.erpRole || null,
     testType: body.testType || "functional",
     loginCredentials: body.loginCredentials || null,
+    attachmentUrl: body.attachmentUrl || null,
   };
 
   const [created] = await db.insert(testCases).values(newCase).returning();
@@ -124,6 +126,7 @@ export async function PUT(request: Request) {
       erpRole: testCases.erpRole,
       testType: testCases.testType,
       loginCredentials: testCases.loginCredentials,
+      attachmentUrl: testCases.attachmentUrl,
       projectId: testPlans.projectId,
     })
     .from(testCases)
@@ -157,6 +160,7 @@ export async function PUT(request: Request) {
       erpRole: body.erpRole ?? existing.erpRole,
       testType: body.testType ?? existing.testType,
       loginCredentials: body.loginCredentials ?? existing.loginCredentials,
+      attachmentUrl: body.attachmentUrl ?? existing.attachmentUrl,
     })
     .where(eq(testCases.id, body.id))
     .returning();

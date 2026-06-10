@@ -38,6 +38,7 @@ export async function PUT(
       notes: body.notes,
       executedBy: body.executedBy,
       executedAt: body.executedAt,
+      attachmentUrl: body.attachmentUrl,
     })
     .where(eq(testCases.id, id))
     .returning();

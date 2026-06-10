@@ -38,7 +38,9 @@ export function ScreenshotViewer({ screenshotUrl, taskCode, taskTitle }: Screens
   const [allFailed, setAllFailed] = useState(false);
 
   const fileId = resolveFileId(screenshotUrl);
-  const driveUrls = fileId ? buildDriveUrls(fileId) : [];
+  const driveUrls = fileId 
+    ? buildDriveUrls(fileId) 
+    : (screenshotUrl ? [screenshotUrl] : []);
   const currentImgUrl = driveUrls[urlIndex] ?? null;
 
   const directLink = fileId

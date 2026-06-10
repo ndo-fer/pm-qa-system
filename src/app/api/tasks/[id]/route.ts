@@ -47,6 +47,7 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
       isArchived: body.isArchived !== undefined ? body.isArchived : existing[0].isArchived,
       erpRole: body.erpRole ?? existing[0].erpRole,
       roleSpecificFeatures: body.roleSpecificFeatures ?? existing[0].roleSpecificFeatures,
+      screenshotUrl: body.screenshotUrl !== undefined ? body.screenshotUrl : existing[0].screenshotUrl,
       updatedAt: new Date().toISOString(),
     })
     .where(and(eq(tasks.id, id), eq(tasks.projectId, session.user.projectId)))

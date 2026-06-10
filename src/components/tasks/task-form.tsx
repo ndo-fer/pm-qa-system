@@ -69,7 +69,7 @@ interface TaskFormProps {
   defaultProjectCode?: string;
 }
 
-const EPICS = ["MST", "INV", "PUR", "SLS", "PRD", "AP", "AR", "FIN", "GL", "RPT", "ADM"];
+const EPICS = ["MST", "INV", "PUR", "SLS", "PRD", "AP", "AR", "FIN", "GL", "RPT", "ADM", "BUG"];
 const PHASES = [
   "Phase 1",
   "Phase 2",
@@ -111,6 +111,7 @@ export function TaskForm({ open, onOpenChange, task, projects, users, onSuccess,
   const [sprintTarget, setSprintTarget] = useState("");
   const [phase, setPhase] = useState("");
   const [erpRole, setErpRole] = useState("all_roles");
+  const [screenshotUrl, setScreenshotUrl] = useState("");
 
   const [loading, setLoading] = useState(false);
 
@@ -151,6 +152,7 @@ export function TaskForm({ open, onOpenChange, task, projects, users, onSuccess,
       setSprintTarget(task.sprintTarget || "");
       setPhase(task.phase || "");
       setErpRole(task.erpRole || "all_roles");
+      setScreenshotUrl(task.screenshotUrl || "");
     } else {
       setTitle("");
       setDescription("");
@@ -172,6 +174,7 @@ export function TaskForm({ open, onOpenChange, task, projects, users, onSuccess,
       setSprintTarget("");
       setPhase("");
       setErpRole("all_roles");
+      setScreenshotUrl("");
     }
   }, [task, open, projects, defaultEpic, defaultProjectCode]);
 
@@ -207,6 +210,7 @@ export function TaskForm({ open, onOpenChange, task, projects, users, onSuccess,
           phase: phase || null,
           erpRole: erpRole || "all_roles",
           roleSpecificFeatures: task ? task.roleSpecificFeatures : null,
+          screenshotUrl: screenshotUrl || null,
         }),
       });
 
@@ -334,11 +338,17 @@ export function TaskForm({ open, onOpenChange, task, projects, users, onSuccess,
                 </Select>
               </div>
 
-              {/* Screenshot from Drive */}
-              {task && (
+              {/* Screenshot URL input */}
+              <div className="space-y-1.5">
+                <label className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Screenshot URL (Image Link)</label>
+                <Input value={screenshotUrl} onChange={(e) => setScreenshotUrl(e.target.value)} placeholder="https://example.com/image.png" className="h-9 text-sm" />
+              </div>
+
+              {/* Screenshot Preview */}
+              {screenshotUrl && (
                 <div className="space-y-1.5 pt-1">
-                  <label className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">UI Screenshot (Google Drive)</label>
-                  <ScreenshotViewer screenshotUrl={task.screenshotUrl} taskCode={task.taskCode} taskTitle={task.title} />
+                  <label className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Screenshot Preview</label>
+                  <ScreenshotViewer screenshotUrl={screenshotUrl} taskCode={taskCode} taskTitle={title} />
                 </div>
               )}
             </div>
