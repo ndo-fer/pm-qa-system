@@ -1,5 +1,5 @@
 import { db } from "../src/db";
-import { projects, tasks, testPlans, testCases, users, milestones } from "../src/db/schema";
+import { projects, tasks, testPlans, testCases, users, milestones, projectMembers } from "../src/db/schema";
 import { eq } from "drizzle-orm";
 import { randomUUID } from "crypto";
 import * as XLSX from "xlsx";
@@ -90,6 +90,8 @@ async function migrate() {
     await db.delete(tasks).where(eq(tasks.projectId, projectId));
     // Delete milestones
     await db.delete(milestones).where(eq(milestones.projectId, projectId));
+    // Delete project members
+    await db.delete(projectMembers).where(eq(projectMembers.projectId, projectId));
     
     console.log("  ✓ Old data cleared successfully.");
   } else {
@@ -97,6 +99,7 @@ async function migrate() {
     await db.insert(projects).values({
       id: projectId,
       name: "ERP Migration",
+      code: "ERP-PM",
       description: "Migration from SABE desktop system to web-based ERP",
       startDate: "2026-05-20",
       endDate: "2026-11-29",
@@ -104,6 +107,20 @@ async function migrate() {
     });
     console.log(`[OK] Created project 'ERP Migration' (id=${projectId})`);
   }
+
+  // Populate project members
+  const allDbUsers = await db.select().from(users);
+  console.log(`\n--- Populating Project Members for ${allDbUsers.length} users ---`);
+  for (const u of allDbUsers) {
+    await db.insert(projectMembers).values({
+      id: randomUUID(),
+      projectId,
+      userId: u.id,
+      role: u.role,
+    });
+    console.log(`  [OK] Added member: ${u.email} as ${u.role}`);
+  }
+
 
   // 2. Get QA user
   const qaUsers = await db.select().from(users).where(eq(users.role, "qa"));

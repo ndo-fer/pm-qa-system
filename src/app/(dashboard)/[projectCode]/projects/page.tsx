@@ -2,9 +2,11 @@
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
+import { useParams } from "next/navigation";
 import { AppLayout } from "@/components/layout/app-layout";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { useSession } from "next-auth/react";
 import {
   Table,
   TableBody,
@@ -14,12 +16,13 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { ProjectForm } from "@/components/projects/project-form";
-import { Plus, Pencil, Trash2, ExternalLink } from "lucide-react";
+import { Plus, Pencil, Trash2, ExternalLink, RotateCw } from "lucide-react";
 import { ExportButton } from "@/components/ui/export-button";
 
 interface Project {
   id: string;
   name: string;
+  code: string;
   description: string | null;
   startDate: string;
   endDate: string | null;
@@ -41,6 +44,12 @@ const statusLabels: Record<string, string> = {
 };
 
 export default function ProjectsPage() {
+  const params = useParams();
+  const projectCodeParam = params?.projectCode as string;
+  
+  const { data: session, update } = useSession();
+  const activeProjectId = session?.user?.projectId;
+  const [switchingId, setSwitchingId] = useState<string | null>(null);
   const [projects, setProjects] = useState<Project[]>([]);
   const [loading, setLoading] = useState(true);
   const [formOpen, setFormOpen] = useState(false);
@@ -66,6 +75,14 @@ export default function ProjectsPage() {
     fetchProjects();
   }
 
+  async function handleSwitch(projectId: string, targetProjectCode: string) {
+    setSwitchingId(projectId);
+    if (update) {
+      await update({ projectId, projectCode: targetProjectCode });
+      window.location.href = `/${targetProjectCode}/projects`;
+    }
+  }
+
   return (
     <AppLayout className="px-4 py-2.5 h-full flex flex-col overflow-hidden">
       <div className="space-y-2 flex flex-col h-full overflow-hidden">
@@ -87,8 +104,10 @@ export default function ProjectsPage() {
           <Table>
             <TableHeader>
               <TableRow>
+                <TableHead>Code</TableHead>
                 <TableHead>Name</TableHead>
                 <TableHead>Status</TableHead>
+                <TableHead>Workspace</TableHead>
                 <TableHead>Start Date</TableHead>
                 <TableHead>End Date</TableHead>
                 <TableHead className="w-24">Actions</TableHead>
@@ -97,21 +116,22 @@ export default function ProjectsPage() {
             <TableBody>
               {loading ? (
                 <TableRow>
-                  <TableCell colSpan={5} className="text-center py-8 text-gray-500">
+                  <TableCell colSpan={7} className="text-center py-8 text-gray-500">
                     Loading...
                   </TableCell>
                 </TableRow>
               ) : projects.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={5} className="text-center py-8 text-gray-500">
+                  <TableCell colSpan={7} className="text-center py-8 text-gray-500">
                     No projects yet. Click "New Project" to create one.
                   </TableCell>
                 </TableRow>
               ) : (
                 projects.map((project) => (
                   <TableRow key={project.id}>
+                    <TableCell className="font-semibold text-slate-700">{project.code}</TableCell>
                     <TableCell>
-                      <Link href={`/projects/${project.id}`} className="font-medium hover:underline inline-flex items-center gap-1">
+                      <Link href={`/${project.code}/dashboard`} className="font-medium hover:underline inline-flex items-center gap-1">
                         {project.name}
                         <ExternalLink className="w-3 h-3" />
                       </Link>
@@ -120,6 +140,26 @@ export default function ProjectsPage() {
                       <Badge variant={statusColors[project.status] || "secondary"}>
                         {statusLabels[project.status] || project.status}
                       </Badge>
+                    </TableCell>
+                    <TableCell>
+                      {project.id === activeProjectId ? (
+                        <span className="inline-flex items-center bg-emerald-50 text-emerald-700 border border-emerald-200 font-semibold text-[10px] px-2 py-0.5 rounded-full">
+                          Active Workspace
+                        </span>
+                      ) : (
+                        <Button 
+                          size="sm" 
+                          variant="outline" 
+                          className="h-6 text-[10px] px-2 py-0.5 font-medium hover:bg-slate-100 hover:text-slate-900" 
+                          onClick={() => handleSwitch(project.id, project.code)}
+                          disabled={switchingId !== null}
+                        >
+                          {switchingId === project.id ? (
+                            <RotateCw className="w-3 h-3 animate-spin mr-1" />
+                          ) : null}
+                          Switch Workspace
+                        </Button>
+                      )}
                     </TableCell>
                     <TableCell>{project.startDate}</TableCell>
                     <TableCell>{project.endDate || "-"}</TableCell>

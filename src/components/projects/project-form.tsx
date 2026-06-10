@@ -23,6 +23,7 @@ import {
 interface Project {
   id: string;
   name: string;
+  code: string;
   description: string | null;
   startDate: string;
   endDate: string | null;
@@ -38,51 +39,86 @@ interface ProjectFormProps {
 
 export function ProjectForm({ open, onOpenChange, project, onSuccess }: ProjectFormProps) {
   const [name, setName] = useState("");
+  const [code, setCode] = useState("");
   const [description, setDescription] = useState("");
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
   const [status, setStatus] = useState("planned");
+  const [file, setFile] = useState<File | null>(null);
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
     if (project) {
       setName(project.name);
+      setCode(project.code || "");
       setDescription(project.description || "");
       setStartDate(project.startDate);
       setEndDate(project.endDate || "");
       setStatus(project.status);
+      setFile(null);
     } else {
       setName("");
+      setCode("");
       setDescription("");
       setStartDate("");
       setEndDate("");
       setStatus("planned");
+      setFile(null);
     }
   }, [project, open]);
+
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setLoading(true);
 
     try {
-      const url = project ? `/api/projects/${project.id}` : "/api/projects";
-      const method = project ? "PUT" : "POST";
+      let res;
+      if (!project && file) {
+        const formData = new FormData();
+        formData.append("file", file);
+        formData.append("name", name);
+        formData.append("code", code);
+        formData.append("description", description);
+        formData.append("startDate", startDate);
+        formData.append("endDate", endDate || "");
 
-      const res = await fetch(url, {
-        method,
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name, description, startDate, endDate: endDate || null, status }),
-      });
+        res = await fetch("/api/projects/import", {
+          method: "POST",
+          body: formData,
+        });
+      } else {
+        const url = project ? `/api/projects/${project.id}` : "/api/projects";
+        const method = project ? "PUT" : "POST";
+
+        res = await fetch(url, {
+          method,
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ 
+            name, 
+            code, 
+            description, 
+            startDate, 
+            endDate: endDate || null, 
+            status 
+          }),
+        });
+      }
 
       if (res.ok) {
         onSuccess();
         onOpenChange(false);
+      } else {
+        const data = await res.json();
+        alert(data.error || "Gagal menyimpan proyek");
       }
     } catch (err) {
       console.error(err);
+      alert("Terjadi kesalahan koneksi");
     }
     setLoading(false);
   }
+
 
   const statusColors: Record<string, string> = {
     planned: "bg-gray-500",
@@ -101,14 +137,42 @@ export function ProjectForm({ open, onOpenChange, project, onSuccess }: ProjectF
           </DialogDescription>
         </DialogHeader>
         <form onSubmit={handleSubmit} className="space-y-4">
-          <div className="space-y-2">
-            <label className="text-sm font-medium">Name</label>
-            <Input value={name} onChange={(e) => setName(e.target.value)} required />
+          <div className="grid grid-cols-3 gap-4">
+            <div className="col-span-2 space-y-2">
+              <label className="text-sm font-medium">Name</label>
+              <Input value={name} onChange={(e) => setName(e.target.value)} required />
+            </div>
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Project Code</label>
+              <Input value={code} onChange={(e) => setCode(e.target.value)} placeholder="e.g. ERP-PM" required />
+            </div>
           </div>
           <div className="space-y-2">
             <label className="text-sm font-medium">Description</label>
             <Input value={description} onChange={(e) => setDescription(e.target.value)} />
           </div>
+          {!project && (
+            <div className="space-y-2 border border-dashed border-gray-300 rounded-md p-3 bg-gray-50/50">
+              <label className="text-sm font-medium block">Excel Template Plan (Opsional)</label>
+              <Input 
+                type="file" 
+                accept=".xlsx, .xls" 
+                onChange={(e) => setFile(e.target.files?.[0] || null)}
+                className="mt-1 bg-white cursor-pointer"
+              />
+              <p className="text-xs text-gray-500 mt-1">
+                Mengunggah Excel akan mengimpor Milestone, Target S-Curve, Developer Tasks, dan QA Test Cases secara otomatis. Unduh template:{" "}
+                <a 
+                  href="/templates/project_import_template.xlsx" 
+                  download 
+                  className="text-blue-500 hover:underline inline-flex items-center font-medium cursor-pointer"
+                >
+                  project_import_template.xlsx
+                </a>
+              </p>
+            </div>
+          )}
+
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
               <label className="text-sm font-medium">Start Date</label>

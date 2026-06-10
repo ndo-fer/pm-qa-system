@@ -2,8 +2,8 @@ import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/auth";
 import { db } from "@/db";
-import { testCases } from "@/db/schema";
-import { eq } from "drizzle-orm";
+import { testCases, testPlans } from "@/db/schema";
+import { and, eq } from "drizzle-orm";
 
 export async function PUT(
   request: Request,
@@ -14,6 +14,17 @@ export async function PUT(
 
   const { id } = await params;
   const body = await request.json();
+
+  const existingResult = await db
+    .select({ id: testCases.id })
+    .from(testCases)
+    .innerJoin(testPlans, eq(testCases.testPlanId, testPlans.id))
+    .where(and(eq(testCases.id, id), eq(testPlans.projectId, session.user.projectId)))
+    .limit(1);
+
+  if (existingResult.length === 0) {
+    return NextResponse.json({ error: "Not found or access denied" }, { status: 404 });
+  }
 
   const [updated] = await db
     .update(testCases)
@@ -46,7 +57,20 @@ export async function DELETE(
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const { id } = await params;
+
+  const existingResult = await db
+    .select({ id: testCases.id })
+    .from(testCases)
+    .innerJoin(testPlans, eq(testCases.testPlanId, testPlans.id))
+    .where(and(eq(testCases.id, id), eq(testPlans.projectId, session.user.projectId)))
+    .limit(1);
+
+  if (existingResult.length === 0) {
+    return NextResponse.json({ error: "Not found or access denied" }, { status: 404 });
+  }
+
   const [deleted] = await db.delete(testCases).where(eq(testCases.id, id)).returning();
+
 
   if (!deleted) {
     return NextResponse.json({ error: "Not found" }, { status: 404 });

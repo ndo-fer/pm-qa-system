@@ -1,6 +1,6 @@
 import { AppLayout } from "@/components/layout/app-layout";
 import { db } from "@/db";
-import { projects, tasks, testCases, testPlans, milestones } from "@/db/schema";
+import { projects, tasks, testCases, testPlans, milestones, projectMembers } from "@/db/schema";
 import { count, eq, and, lt, desc } from "drizzle-orm";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -8,30 +8,66 @@ import { FolderKanban, CheckSquare, AlertCircle, TestTube, Target } from "lucide
 import Link from "next/link";
 import { calculateSCurveGroup } from "@/lib/s-curve";
 import { SCurveChart } from "@/components/projects/s-curve-chart";
+import { getServerSession } from "next-auth";
+import { authOptions } from "@/auth";
+import { redirect } from "next/navigation";
 
-async function getStats() {
-  const projectCount = await db.select({ count: count() }).from(projects);
-  const taskCount = await db.select({ count: count() }).from(tasks);
-  const doneTasks = await db.select({ count: count() }).from(tasks).where(eq(tasks.status, "done"));
-  const inProgressTasks = await db.select({ count: count() }).from(tasks).where(eq(tasks.status, "in_progress"));
-  const qaCount = await db.select({ count: count() }).from(testCases);
-  const passedQA = await db.select({ count: count() }).from(testCases).where(eq(testCases.status, "pass"));
-  const failedQA = await db.select({ count: count() }).from(testCases).where(eq(testCases.status, "fail"));
-  const planCount = await db.select({ count: count() }).from(testPlans);
-  const milestoneCount = await db.select({ count: count() }).from(milestones);
+async function getStats(activeProjectId: string, userId: string) {
+  const projectCount = await db
+    .select({ count: count() })
+    .from(projectMembers)
+    .where(eq(projectMembers.userId, userId));
+
+  const taskCount = await db
+    .select({ count: count() })
+    .from(tasks)
+    .where(eq(tasks.projectId, activeProjectId));
+
+  const doneTasks = await db
+    .select({ count: count() })
+    .from(tasks)
+    .where(and(eq(tasks.projectId, activeProjectId), eq(tasks.status, "done")));
+
+  const inProgressTasks = await db
+    .select({ count: count() })
+    .from(tasks)
+    .where(and(eq(tasks.projectId, activeProjectId), eq(tasks.status, "in_progress")));
+
+  const qaCount = await db
+    .select({ count: count() })
+    .from(testCases)
+    .innerJoin(testPlans, eq(testCases.testPlanId, testPlans.id))
+    .where(eq(testPlans.projectId, activeProjectId));
+
+  const passedQA = await db
+    .select({ count: count() })
+    .from(testCases)
+    .innerJoin(testPlans, eq(testCases.testPlanId, testPlans.id))
+    .where(and(eq(testPlans.projectId, activeProjectId), eq(testCases.status, "pass")));
+
+  const failedQA = await db
+    .select({ count: count() })
+    .from(testCases)
+    .innerJoin(testPlans, eq(testCases.testPlanId, testPlans.id))
+    .where(and(eq(testPlans.projectId, activeProjectId), eq(testCases.status, "fail")));
+
+  const planCount = await db
+    .select({ count: count() })
+    .from(testPlans)
+    .where(eq(testPlans.projectId, activeProjectId));
+
+  const milestoneCount = await db
+    .select({ count: count() })
+    .from(milestones)
+    .where(eq(milestones.projectId, activeProjectId));
 
   const today = new Date().toISOString().split("T")[0];
   const overdueTasks = await db
     .select({ count: count() })
     .from(tasks)
-    .where(and(eq(tasks.status, "todo"), lt(tasks.dueDate, today)));
+    .where(and(eq(tasks.projectId, activeProjectId), eq(tasks.status, "todo"), lt(tasks.dueDate, today)));
 
-  // Get dynamically calculated S-Curve group data
-  const projectList = await db.select().from(projects);
-  const projectId = projectList[0]?.id;
-  const sCurveGroup = projectId
-    ? await calculateSCurveGroup(projectId)
-    : { overall: [], monthly: { monthName: "N/A", weeks: [] }, weekly: { weekNumber: 0, days: [] } };
+  const sCurveGroup = await calculateSCurveGroup(activeProjectId);
 
   return {
     projects: projectCount[0].count,
@@ -48,12 +84,21 @@ async function getStats() {
   };
 }
 
-async function getRecentTasks() {
-  return await db.select().from(tasks).orderBy(desc(tasks.createdAt)).limit(5);
+async function getRecentTasks(activeProjectId: string) {
+  return await db
+    .select()
+    .from(tasks)
+    .where(eq(tasks.projectId, activeProjectId))
+    .orderBy(desc(tasks.createdAt))
+    .limit(5);
 }
 
-async function getMilestones() {
-  return await db.select().from(milestones).orderBy(milestones.startDate);
+async function getMilestones(activeProjectId: string) {
+  return await db
+    .select()
+    .from(milestones)
+    .where(eq(milestones.projectId, activeProjectId))
+    .orderBy(milestones.startDate);
 }
 
 const statusLabels: Record<string, string> = {
@@ -70,10 +115,38 @@ const statusColors: Record<string, "default" | "secondary" | "destructive"> = {
   done: "default",
 };
 
-export default async function DashboardPage() {
-  const stats = await getStats();
-  const recentTasks = await getRecentTasks();
-  const milestoneList = await getMilestones();
+export default async function DashboardPage({ params }: { params: Promise<{ projectCode: string }> }) {
+  const session = await getServerSession(authOptions);
+  if (!session) {
+    redirect("/login");
+  }
+
+  const { projectCode } = await params;
+  const activeProject = (await db.select().from(projects).where(eq(projects.code, projectCode)).limit(1))[0];
+  if (!activeProject) {
+    redirect(`/${session.user.projectCode}/projects`);
+  }
+
+  const userId = session.user.id;
+  const member = await db.select()
+    .from(projectMembers)
+    .where(
+      and(
+        eq(projectMembers.projectId, activeProject.id),
+        eq(projectMembers.userId, userId)
+      )
+    )
+    .limit(1);
+
+  if (member.length === 0) {
+    redirect(`/${session.user.projectCode}/projects`);
+  }
+
+  const activeProjectId = activeProject.id;
+
+  const stats = await getStats(activeProjectId, userId);
+  const recentTasks = await getRecentTasks(activeProjectId);
+  const milestoneList = await getMilestones(activeProjectId);
 
   // Current week from S-Curve — use string comparison to avoid UTC timezone mismatch
   const now = new Date();
@@ -88,7 +161,7 @@ export default async function DashboardPage() {
       <div className="space-y-4">
         <div>
           <h1 className="text-xl font-bold">Dashboard</h1>
-          <p className="text-xs text-gray-500">ERP Migration Project — SABE to Web</p>
+          <p className="text-xs text-gray-500">{activeProject?.name}{activeProject?.description ? ` — ${activeProject.description}` : ""}</p>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
@@ -99,7 +172,7 @@ export default async function DashboardPage() {
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold">{stats.milestones}</div>
-              <p className="text-xs text-gray-500">10 phases</p>
+              <p className="text-xs text-gray-500">{stats.milestones} phases</p>
             </CardContent>
           </Card>
 
@@ -229,7 +302,7 @@ export default async function DashboardPage() {
               {milestoneList.map((ms) => (
                 <Link
                   key={ms.id}
-                  href={`/tasks?phase=${encodeURIComponent(ms.phase)}`}
+                  href={`/${projectCode}/tasks?phase=${encodeURIComponent(ms.phase)}`}
                   className="flex items-center gap-4 p-2.5 rounded-lg hover:bg-slate-50/80 border border-transparent hover:border-slate-100 transition-all cursor-pointer group"
                 >
                   <div className="w-20 text-xs font-mono text-slate-550 font-bold group-hover:text-blue-600 transition-colors">{ms.phase}</div>
@@ -276,7 +349,7 @@ export default async function DashboardPage() {
               </div>
             )}
             <div className="mt-4">
-              <Link href="/tasks" className="text-sm text-blue-600 hover:underline">
+              <Link href={`/${projectCode}/tasks`} className="text-sm text-blue-600 hover:underline">
                 View all tasks →
               </Link>
             </div>

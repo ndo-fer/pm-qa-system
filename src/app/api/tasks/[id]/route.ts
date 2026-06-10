@@ -3,14 +3,14 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/auth";
 import { db } from "@/db";
 import { tasks } from "@/db/schema";
-import { eq } from "drizzle-orm";
+import { eq, and } from "drizzle-orm";
 
 export async function GET(request: Request, { params }: { params: Promise<{ id: string }> }) {
   const session = await getServerSession(authOptions);
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const { id } = await params;
-  const task = await db.select().from(tasks).where(eq(tasks.id, id)).limit(1);
+  const task = await db.select().from(tasks).where(and(eq(tasks.id, id), eq(tasks.projectId, session.user.projectId))).limit(1);
   if (task.length === 0) return NextResponse.json({ error: "Not found" }, { status: 404 });
   return NextResponse.json(task[0]);
 }
@@ -21,7 +21,7 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
 
   const { id } = await params;
   const body = await request.json();
-  const existing = await db.select().from(tasks).where(eq(tasks.id, id)).limit(1);
+  const existing = await db.select().from(tasks).where(and(eq(tasks.id, id), eq(tasks.projectId, session.user.projectId))).limit(1);
   if (existing.length === 0) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
   const updated = await db
@@ -49,7 +49,7 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
       roleSpecificFeatures: body.roleSpecificFeatures ?? existing[0].roleSpecificFeatures,
       updatedAt: new Date().toISOString(),
     })
-    .where(eq(tasks.id, id))
+    .where(and(eq(tasks.id, id), eq(tasks.projectId, session.user.projectId)))
     .returning();
 
   return NextResponse.json(updated[0]);
@@ -60,9 +60,10 @@ export async function DELETE(request: Request, { params }: { params: Promise<{ i
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const { id } = await params;
-  const existing = await db.select().from(tasks).where(eq(tasks.id, id)).limit(1);
+  const existing = await db.select().from(tasks).where(and(eq(tasks.id, id), eq(tasks.projectId, session.user.projectId))).limit(1);
   if (existing.length === 0) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
-  await db.delete(tasks).where(eq(tasks.id, id));
+  await db.delete(tasks).where(and(eq(tasks.id, id), eq(tasks.projectId, session.user.projectId)));
   return NextResponse.json({ success: true });
 }
+

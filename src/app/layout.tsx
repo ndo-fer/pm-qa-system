@@ -16,7 +16,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "ERP Project Management",
+  title: "PDJ Management",
   description: "Unified project management system for ERP development",
 };
 

@@ -123,7 +123,8 @@ export async function syncGoogleSheets(options?: SyncOptions) {
       if (row.length === 0) continue;
 
       const id = row[0]?.trim();
-      const projectId = row[1]?.trim() || defaultProject.id;
+      const projectId = row[1]?.trim();
+      const resolvedProjectId = allProjects.some(p => p.id === projectId) ? projectId : defaultProject.id;
       const taskCode = row[2]?.trim() || null;
       const title = row[3]?.trim();
       const epic = row[4]?.trim() || null;
@@ -173,12 +174,13 @@ export async function syncGoogleSheets(options?: SyncOptions) {
             dbTask.epic !== epic ||
             dbTask.feature !== feature ||
             dbTask.taskCode !== taskCode ||
-            dbTask.dueDate !== dueDate;
+            dbTask.dueDate !== dueDate ||
+            dbTask.projectId !== resolvedProjectId;
 
           if (hasChanges) {
             await db.update(tasks)
               .set({
-                projectId,
+                projectId: resolvedProjectId,
                 taskCode,
                 title,
                 epic,
@@ -198,7 +200,7 @@ export async function syncGoogleSheets(options?: SyncOptions) {
         } else {
           const newTask: NewTask = {
             id,
-            projectId,
+            projectId: resolvedProjectId,
             taskCode,
             title,
             epic,
@@ -219,7 +221,7 @@ export async function syncGoogleSheets(options?: SyncOptions) {
         const newId = randomUUID();
         const newTask: NewTask = {
           id: newId,
-          projectId,
+          projectId: resolvedProjectId,
           taskCode,
           title,
           epic,
@@ -488,6 +490,7 @@ export async function syncGoogleSheets(options?: SyncOptions) {
 
       const id = row[0]?.trim();
       const projectId = row[1]?.trim();
+      const resolvedProjectId = allProjects.some(p => p.id === projectId) ? projectId : defaultProject.id;
       const name = row[2]?.trim();
       const moduleName = row[3]?.trim();
       let status = (row[4]?.trim() || "draft").toLowerCase();
@@ -506,12 +509,12 @@ export async function syncGoogleSheets(options?: SyncOptions) {
             dbPlan.name !== name ||
             dbPlan.module !== moduleName ||
             dbPlan.status !== status ||
-            dbPlan.projectId !== projectId;
+            dbPlan.projectId !== resolvedProjectId;
 
           if (hasChanges) {
             await db.update(testPlans)
               .set({
-                projectId,
+                projectId: resolvedProjectId,
                 name,
                 module: moduleName as any,
                 status: status as any,
@@ -521,7 +524,7 @@ export async function syncGoogleSheets(options?: SyncOptions) {
         } else {
           const newPlan: NewTestPlan = {
             id,
-            projectId,
+            projectId: resolvedProjectId,
             name,
             module: moduleName as any,
             status: status as any,
@@ -532,7 +535,7 @@ export async function syncGoogleSheets(options?: SyncOptions) {
         const newId = randomUUID();
         const newPlan: NewTestPlan = {
           id: newId,
-          projectId: projectId || defaultProject.id,
+          projectId: resolvedProjectId,
           name,
           module: moduleName as any,
           status: status as any,

@@ -13,12 +13,21 @@ export const users = pgTable("users", {
 export const projects = pgTable("projects", {
   id: text("id").primaryKey(),
   name: text("name").notNull(),
+  code: text("code").unique().notNull(),
   description: text("description"),
   startDate: text("start_date").notNull(),
   endDate: text("end_date"),
   status: text("status").$type<"planned" | "active" | "on_hold" | "completed">().notNull().default("planned"),
   sCurveTarget: jsonb("s_curve_target"),
   sCurveActual: jsonb("s_curve_actual"),
+  createdAt: timestamp("created_at", { mode: "string" }).defaultNow(),
+});
+
+export const projectMembers = pgTable("project_members", {
+  id: text("id").primaryKey(),
+  projectId: text("project_id").notNull().references(() => projects.id),
+  userId: text("user_id").notNull().references(() => users.id),
+  role: text("role").$type<"admin" | "pm" | "developer" | "qa">().notNull(),
   createdAt: timestamp("created_at", { mode: "string" }).defaultNow(),
 });
 
@@ -107,6 +116,9 @@ export type TestPlan = typeof testPlans.$inferSelect;
 export type NewTestPlan = typeof testPlans.$inferInsert;
 export type TestCase = typeof testCases.$inferSelect;
 export type NewTestCase = typeof testCases.$inferInsert;
+export type ProjectMember = typeof projectMembers.$inferSelect;
+export type NewProjectMember = typeof projectMembers.$inferInsert;
+
 
 // ERP role-based types
 export interface RoleSpecificFeatures {

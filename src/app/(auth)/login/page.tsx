@@ -11,6 +11,7 @@ export default function LoginPage() {
   const router = useRouter();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [projectCode, setProjectCode] = useState("ERP-PM");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
@@ -22,13 +23,14 @@ export default function LoginPage() {
     const result = await signIn("credentials", {
       email,
       password,
+      projectCode,
       redirect: false,
     });
 
     if (result?.error) {
-      setError("Email atau password salah");
+      setError(result.error === "CredentialsSignin" ? "Email, password, atau kode proyek salah" : result.error);
     } else {
-      router.push("/dashboard");
+      router.push(`/${projectCode}/dashboard`);
       router.refresh();
     }
     setLoading(false);
@@ -38,11 +40,21 @@ export default function LoginPage() {
     <div className="flex items-center justify-center min-h-screen bg-gray-100">
       <Card className="w-full max-w-md">
         <CardHeader className="text-center">
-          <CardTitle className="text-2xl">ERP Project Management</CardTitle>
+          <CardTitle className="text-2xl">PDJ Management</CardTitle>
           <CardDescription>Masuk untuk melanjutkan</CardDescription>
         </CardHeader>
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-4">
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Kode Proyek</label>
+              <Input
+                type="text"
+                placeholder="ERP-PM"
+                value={projectCode}
+                onChange={(e) => setProjectCode(e.target.value)}
+                required
+              />
+            </div>
             <div className="space-y-2">
               <label className="text-sm font-medium">Email</label>
               <Input
@@ -75,3 +87,4 @@ export default function LoginPage() {
     </div>
   );
 }
+

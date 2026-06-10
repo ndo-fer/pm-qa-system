@@ -3,7 +3,7 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/auth";
 import { db } from "@/db";
 import { testPlans } from "@/db/schema";
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 
 export async function PUT(
   request: Request,
@@ -22,7 +22,7 @@ export async function PUT(
       module: body.module,
       status: body.status,
     })
-    .where(eq(testPlans.id, id))
+    .where(and(eq(testPlans.id, id), eq(testPlans.projectId, session.user.projectId)))
     .returning();
 
   if (!updated) {
@@ -40,7 +40,11 @@ export async function DELETE(
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const { id } = await params;
-  const [deleted] = await db.delete(testPlans).where(eq(testPlans.id, id)).returning();
+  const [deleted] = await db
+    .delete(testPlans)
+    .where(and(eq(testPlans.id, id), eq(testPlans.projectId, session.user.projectId)))
+    .returning();
+
 
   if (!deleted) {
     return NextResponse.json({ error: "Not found" }, { status: 404 });

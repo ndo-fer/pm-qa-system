@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { useSession } from "next-auth/react";
+import { useParams } from "next/navigation";
 import { AppLayout } from "@/components/layout/app-layout";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -106,6 +107,9 @@ const priorityLabels: Record<string, string> = {
 
 export default function TasksPage() {
   const { data: session } = useSession();
+  const params = useParams();
+  const projectCode = params?.projectCode as string;
+
   const [tasks, setTasks] = useState<Task[]>([]);
   const [projects, setProjects] = useState<Project[]>([]);
   const [users, setUsers] = useState<User[]>([]);
@@ -197,14 +201,15 @@ export default function TasksPage() {
 
   async function fetchData() {
     setLoading(true);
-    const params = new URLSearchParams();
-    if (filterErpRole) params.set("erpRole", filterErpRole);
+    const queryParams = new URLSearchParams();
+    if (filterErpRole) queryParams.set("erpRole", filterErpRole);
+    if (projectCode) queryParams.set("projectCode", projectCode);
     
     const [tasksRes, projectsRes, usersRes, milestonesRes] = await Promise.all([
-      fetch(`/api/tasks?${params.toString()}`),
+      fetch(`/api/tasks?${queryParams.toString()}`),
       fetch("/api/projects"),
       fetch("/api/users"),
-      fetch("/api/milestones"),
+      fetch(`/api/milestones?projectCode=${projectCode}`),
     ]);
     if (tasksRes.ok) setTasks(await tasksRes.json());
     if (projectsRes.ok) setProjects(await projectsRes.json());
@@ -647,6 +652,7 @@ export default function TasksPage() {
         onSuccess={fetchData}
         modules={modules}
         defaultEpic={filterEpic}
+        defaultProjectCode={projectCode}
       />
 
       <TaskPreviewModal

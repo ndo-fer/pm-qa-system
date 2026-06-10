@@ -2,8 +2,9 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useParams } from "next/navigation";
 import { cn } from "@/lib/utils";
+import { useSession, signOut } from "next-auth/react";
 import {
   LayoutDashboard,
   FolderKanban,
@@ -12,19 +13,25 @@ import {
   Users,
   PanelLeftClose,
   PanelLeftOpen,
+  LogOut,
 } from "lucide-react";
-
-const navItems = [
-  { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
-  { href: "/projects", label: "Projects", icon: FolderKanban },
-  { href: "/tasks", label: "Tasks", icon: CheckSquare },
-  { href: "/qa", label: "QA Testing", icon: TestTube },
-  { href: "/users", label: "Users", icon: Users },
-];
 
 export function Sidebar() {
   const pathname = usePathname();
+  const params = useParams();
   const [collapsed, setCollapsed] = useState(false);
+  const { data: session } = useSession();
+
+  const projectCode = params?.projectCode as string;
+  const currentProjectCode = projectCode || session?.user?.projectCode || "ERP-PM";
+
+  const navItems = [
+    { href: `/${currentProjectCode}/dashboard`, label: "Dashboard", icon: LayoutDashboard },
+    { href: `/${currentProjectCode}/projects`, label: "Projects", icon: FolderKanban },
+    { href: `/${currentProjectCode}/tasks`, label: "Tasks", icon: CheckSquare },
+    { href: `/${currentProjectCode}/qa`, label: "QA Testing", icon: TestTube },
+    { href: `/${currentProjectCode}/users`, label: "Users", icon: Users },
+  ];
 
   return (
     <aside
@@ -36,13 +43,30 @@ export function Sidebar() {
       <div
         className={cn(
           "flex items-center border-b border-gray-800",
-          collapsed ? "justify-center p-3" : "p-6 justify-between"
+          collapsed ? "justify-center p-3" : "py-6 pl-6 pr-4 justify-between"
         )}
       >
-        {!collapsed && <h1 className="text-xl font-bold truncate">ERP PM</h1>}
+        {!collapsed && (
+          <div className="flex flex-col min-w-0">
+            <h1 className="text-lg font-bold tracking-tight truncate">PDJ Management</h1>
+            {currentProjectCode && (
+              <span className="text-xs text-blue-400 font-medium truncate mt-0.5">
+                Proyek: {currentProjectCode}
+              </span>
+            )}
+          </div>
+        )}
+        {collapsed && currentProjectCode && (
+          <span 
+            className="text-[10px] bg-blue-900/50 text-blue-400 font-bold px-1.5 py-0.5 rounded border border-blue-800/50"
+            title={`Proyek: ${currentProjectCode}`}
+          >
+            {currentProjectCode.substring(0, 4)}
+          </span>
+        )}
         <button
           onClick={() => setCollapsed(!collapsed)}
-          className="text-gray-400 hover:text-white transition-colors cursor-pointer"
+          className="text-gray-400 hover:text-white transition-colors cursor-pointer ml-2"
         >
           {collapsed ? (
             <PanelLeftOpen className="w-5 h-5" />
@@ -54,7 +78,7 @@ export function Sidebar() {
       <nav className="flex-1 p-3 space-y-1">
         {navItems.map((item) => {
           const Icon = item.icon;
-          const isActive = pathname === item.href;
+          const isActive = pathname === item.href || (item.href !== "/" && pathname.startsWith(item.href + "/"));
           return (
             <Link
               key={item.href}
@@ -76,6 +100,20 @@ export function Sidebar() {
           );
         })}
       </nav>
+      <div className="border-t border-gray-800 p-3">
+        <button
+          onClick={() => signOut({ callbackUrl: "/login" })}
+          className={cn(
+            "flex items-center rounded-md text-sm transition-colors text-gray-400 hover:bg-gray-850 hover:text-red-400 w-full cursor-pointer",
+            collapsed ? "justify-center p-2" : "gap-3 px-3 py-2"
+          )}
+          title="Switch Project"
+        >
+          <LogOut className="w-5 h-5 shrink-0 text-red-500" />
+          {!collapsed && <span>Switch Project</span>}
+        </button>
+      </div>
     </aside>
   );
 }
+

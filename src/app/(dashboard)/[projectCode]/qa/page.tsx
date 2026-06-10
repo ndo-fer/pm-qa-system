@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { useSession } from "next-auth/react";
+import { useParams } from "next/navigation";
 import { AppLayout } from "@/components/layout/app-layout";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -101,6 +102,9 @@ const moduleToEpicMap: Record<string, string> = {
 
 export default function QAPage() {
   const { data: session } = useSession();
+  const params = useParams();
+  const projectCode = params?.projectCode as string;
+
   const userRole = (session?.user as any)?.role || "user";
   const isQA = userRole === "qa";
 
@@ -171,9 +175,11 @@ export default function QAPage() {
   async function fetchData() {
     setLoading(true);
     try {
+      const plansUrl = projectCode ? `/api/test-plans?projectCode=${projectCode}` : "/api/test-plans";
+      const casesUrl = projectCode ? `/api/test-cases?projectCode=${projectCode}` : "/api/test-cases";
       const [plansRes, casesRes, projectsRes] = await Promise.all([
-        fetch("/api/test-plans"),
-        fetch("/api/test-cases"),
+        fetch(plansUrl),
+        fetch(casesUrl),
         fetch("/api/projects"),
       ]);
       if (plansRes.ok) setTestPlans(await plansRes.json());
@@ -228,15 +234,14 @@ export default function QAPage() {
   }, [newCaseErpRole]);
 
   async function createPlan() {
-    if (!newPlanName || !newPlanModule || !newPlanProject) return;
+    if (!newPlanName || !newPlanModule) return;
     await fetch("/api/test-plans", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ name: newPlanName, module: newPlanModule, projectId: newPlanProject }),
+      body: JSON.stringify({ name: newPlanName, module: newPlanModule, projectCode }),
     });
     setNewPlanName("");
     setNewPlanModule("");
-    setNewPlanProject("");
     setShowNewPlan(false);
     fetchData();
   }
@@ -278,11 +283,11 @@ export default function QAPage() {
   }
 
   async function updatePlan() {
-    if (!editingPlan || !editPlanName || !editPlanModule || !editPlanProject) return;
+    if (!editingPlan || !editPlanName || !editPlanModule) return;
     await fetch(`/api/test-plans/${editingPlan.id}`, {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ name: editPlanName, module: editPlanModule, projectId: editPlanProject }),
+      body: JSON.stringify({ name: editPlanName, module: editPlanModule }),
     });
     setEditingPlan(null);
     setShowEditPlan(false);
@@ -1132,35 +1137,19 @@ export default function QAPage() {
               <Input placeholder="e.g. Pemasok - Katalog Pemasok" value={newPlanName} onChange={(e) => setNewPlanName(e.target.value)} />
             </div>
             
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-1.5">
-                <label className="text-xs font-semibold text-slate-700">ERP Module</label>
-                <Select value={newPlanModule} onValueChange={(v) => setNewPlanModule(v || "")}>
-                  <SelectTrigger className="text-xs"><SelectValue placeholder="Module" /></SelectTrigger>
-                  <SelectContent>
-                    {modules.map((m) => <SelectItem key={m} value={m}>{m}</SelectItem>)}
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div className="space-y-1.5">
-                <label className="text-xs font-semibold text-slate-700">Project</label>
-                <Select value={newPlanProject} onValueChange={(v) => setNewPlanProject(v || "")}>
-                  <SelectTrigger className="text-xs">
-                    <span data-slot="select-value" className="flex flex-1 text-left">
-                      {projects.find((p) => p.id === newPlanProject)?.name || "Project"}
-                    </span>
-                  </SelectTrigger>
-                  <SelectContent>
-                    {projects.map((p) => <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>)}
-                  </SelectContent>
-                </Select>
-              </div>
+            <div className="space-y-1.5">
+              <label className="text-xs font-semibold text-slate-700">ERP Module</label>
+              <Select value={newPlanModule} onValueChange={(v) => setNewPlanModule(v || "")}>
+                <SelectTrigger className="text-xs"><SelectValue placeholder="Module" /></SelectTrigger>
+                <SelectContent>
+                  {modules.map((m) => <SelectItem key={m} value={m}>{m}</SelectItem>)}
+                </SelectContent>
+              </Select>
             </div>
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setShowNewPlan(false)}>Cancel</Button>
-            <Button onClick={createPlan} disabled={!newPlanName || !newPlanModule || !newPlanProject}>Create Suite</Button>
+            <Button onClick={createPlan} disabled={!newPlanName || !newPlanModule}>Create Suite</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -1268,35 +1257,19 @@ export default function QAPage() {
               <Input placeholder="e.g. Pemasok - Katalog Pemasok" value={editPlanName} onChange={(e) => setEditPlanName(e.target.value)} />
             </div>
             
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-1.5">
-                <label className="text-xs font-semibold text-slate-700">ERP Module</label>
-                <Select value={editPlanModule} onValueChange={(v) => setEditPlanModule(v || "")}>
-                  <SelectTrigger className="text-xs"><SelectValue placeholder="Module" /></SelectTrigger>
-                  <SelectContent>
-                    {modules.map((m) => <SelectItem key={m} value={m}>{m}</SelectItem>)}
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div className="space-y-1.5">
-                <label className="text-xs font-semibold text-slate-700">Project</label>
-                <Select value={editPlanProject} onValueChange={(v) => setEditPlanProject(v || "")}>
-                  <SelectTrigger className="text-xs">
-                    <span data-slot="select-value" className="flex flex-1 text-left">
-                      {projects.find((p) => p.id === editPlanProject)?.name || "Project"}
-                    </span>
-                  </SelectTrigger>
-                  <SelectContent>
-                    {projects.map((p) => <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>)}
-                  </SelectContent>
-                </Select>
-              </div>
+            <div className="space-y-1.5">
+              <label className="text-xs font-semibold text-slate-700">ERP Module</label>
+              <Select value={editPlanModule} onValueChange={(v) => setEditPlanModule(v || "")}>
+                <SelectTrigger className="text-xs"><SelectValue placeholder="Module" /></SelectTrigger>
+                <SelectContent>
+                  {modules.map((m) => <SelectItem key={m} value={m}>{m}</SelectItem>)}
+                </SelectContent>
+              </Select>
             </div>
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => { setShowEditPlan(false); setEditingPlan(null); }}>Cancel</Button>
-            <Button onClick={updatePlan} disabled={!editPlanName || !editPlanModule || !editPlanProject}>Save Changes</Button>
+            <Button onClick={updatePlan} disabled={!editPlanName || !editPlanModule}>Save Changes</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

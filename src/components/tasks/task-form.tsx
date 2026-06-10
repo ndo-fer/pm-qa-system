@@ -24,6 +24,7 @@ import { ScreenshotViewer } from "./screenshot-viewer";
 interface Project {
   id: string;
   name: string;
+  code?: string;
 }
 
 interface User {
@@ -65,6 +66,7 @@ interface TaskFormProps {
   onSuccess: () => void;
   modules?: string[];
   defaultEpic?: string;
+  defaultProjectCode?: string;
 }
 
 const EPICS = ["MST", "INV", "PUR", "SLS", "PRD", "AP", "AR", "FIN", "GL", "RPT", "ADM"];
@@ -86,7 +88,7 @@ const ERP_ROLES = [
   { value: "user", label: "User" },
 ];
 
-export function TaskForm({ open, onOpenChange, task, projects, users, onSuccess, modules, defaultEpic }: TaskFormProps) {
+export function TaskForm({ open, onOpenChange, task, projects, users, onSuccess, modules, defaultEpic, defaultProjectCode }: TaskFormProps) {
   const activeModules = modules || EPICS;
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
@@ -152,7 +154,8 @@ export function TaskForm({ open, onOpenChange, task, projects, users, onSuccess,
     } else {
       setTitle("");
       setDescription("");
-      setProjectId(projects[0]?.id || "");
+      const matchedProject = projects.find((p) => p.code === defaultProjectCode);
+      setProjectId(matchedProject?.id || projects[0]?.id || "");
       setAssigneeId("");
       setStatus("todo");
       setPriority("medium");
@@ -170,7 +173,7 @@ export function TaskForm({ open, onOpenChange, task, projects, users, onSuccess,
       setPhase("");
       setErpRole("all_roles");
     }
-  }, [task, open, projects, defaultEpic]);
+  }, [task, open, projects, defaultEpic, defaultProjectCode]);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();

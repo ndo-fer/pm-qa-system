@@ -2,32 +2,62 @@ import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/auth";
 import { db } from "@/db";
-import { projects, tasks, testCases, testPlans, milestones } from "@/db/schema";
+import { projects, tasks, testCases, testPlans, milestones, projectMembers } from "@/db/schema";
 import { count, eq, and, lt } from "drizzle-orm";
 
 export async function GET() {
   const session = await getServerSession(authOptions);
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-  const projectCount = await db.select({ count: count() }).from(projects);
-  const taskCount = await db.select({ count: count() }).from(tasks);
-  const doneTasks = await db.select({ count: count() }).from(tasks).where(eq(tasks.status, "done"));
-  const inProgressTasks = await db.select({ count: count() }).from(tasks).where(eq(tasks.status, "in_progress"));
-  const qaCount = await db.select({ count: count() }).from(testCases);
-  const passedQA = await db.select({ count: count() }).from(testCases).where(eq(testCases.status, "pass"));
-  const failedQA = await db.select({ count: count() }).from(testCases).where(eq(testCases.status, "fail"));
-  const planCount = await db.select({ count: count() }).from(testPlans);
-  const milestoneCount = await db.select({ count: count() }).from(milestones);
+  const activeProjectId = session.user.projectId;
+
+  const projectCount = await db.select({ count: count() }).from(projectMembers).where(eq(projectMembers.userId, session.user.id));
+  const taskCount = await db.select({ count: count() }).from(tasks).where(eq(tasks.projectId, activeProjectId));
+  const doneTasks = await db.select({ count: count() }).from(tasks).where(and(eq(tasks.projectId, activeProjectId), eq(tasks.status, "done")));
+  const inProgressTasks = await db.select({ count: count() }).from(tasks).where(and(eq(tasks.projectId, activeProjectId), eq(tasks.status, "in_progress")));
+  
+  const qaCountResult = await db
+    .select({ count: count() })
+    .from(testCases)
+    .innerJoin(testPlans, eq(testCases.testPlanId, testPlans.id))
+    .where(eq(testPlans.projectId, activeProjectId));
+  const qaCount = qaCountResult[0]?.count || 0;
+
+  const passedQAResult = await db
+    .select({ count: count() })
+    .from(testCases)
+    .innerJoin(testPlans, eq(testCases.testPlanId, testPlans.id))
+    .where(and(eq(testPlans.projectId, activeProjectId), eq(testCases.status, "pass")));
+  const passedQA = passedQAResult[0]?.count || 0;
+
+  const failedQAResult = await db
+    .select({ count: count() })
+    .from(testCases)
+    .innerJoin(testPlans, eq(testCases.testPlanId, testPlans.id))
+    .where(and(eq(testPlans.projectId, activeProjectId), eq(testCases.status, "fail")));
+  const failedQA = failedQAResult[0]?.count || 0;
+
+  const planCount = await db.select({ count: count() }).from(testPlans).where(eq(testPlans.projectId, activeProjectId));
+  const milestoneCount = await db.select({ count: count() }).from(milestones).where(eq(milestones.projectId, activeProjectId));
 
   const today = new Date().toISOString().split("T")[0];
   const overdueTasks = await db
     .select({ count: count() })
     .from(tasks)
-    .where(and(eq(tasks.status, "todo"), lt(tasks.dueDate, today)));
+    .where(and(eq(tasks.projectId, activeProjectId), eq(tasks.status, "todo"), lt(tasks.dueDate, today)));
 
-  // Get S-Curve data from project
-  const project = await db.select().from(projects).limit(1);
-  const sCurve = project[0]?.sCurveTarget ? JSON.parse(project[0].sCurveTarget as string) : [];
+  // Get S-Curve data from active project
+  const project = await db.select().from(projects).where(eq(projects.id, activeProjectId)).limit(1);
+  let sCurve = [];
+  if (project[0]?.sCurveTarget) {
+    try {
+      sCurve = typeof project[0].sCurveTarget === "string" 
+        ? JSON.parse(project[0].sCurveTarget) 
+        : project[0].sCurveTarget;
+    } catch (e) {
+      sCurve = project[0].sCurveTarget as any;
+    }
+  }
 
   return NextResponse.json({
     projects: projectCount[0].count,
@@ -35,11 +65,12 @@ export async function GET() {
     doneTasks: doneTasks[0].count,
     inProgressTasks: inProgressTasks[0].count,
     overdueTasks: overdueTasks[0].count,
-    totalQA: qaCount[0].count,
-    passedQA: passedQA[0].count,
-    failedQA: failedQA[0].count,
+    totalQA: qaCount,
+    passedQA: passedQA,
+    failedQA: failedQA,
     testPlans: planCount[0].count,
     milestones: milestoneCount[0].count,
     sCurve,
   });
 }
+
