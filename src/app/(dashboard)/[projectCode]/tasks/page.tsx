@@ -141,6 +141,10 @@ export default function TasksPage() {
   const [previewOpen, setPreviewOpen] = useState(false);
   const [previewTask, setPreviewTask] = useState<Task | null>(null);
 
+  // Drag and Drop state for modules
+  const [draggedIndex, setDraggedIndex] = useState<number | null>(null);
+  const [dragOverIndex, setDragOverIndex] = useState<number | null>(null);
+
   // Set default filter to current logged-in developer
   useEffect(() => {
     if (session?.user) {
@@ -234,6 +238,26 @@ export default function TasksPage() {
       if (statusParam) {
         setFilterStatus(statusParam);
       }
+
+      // Load modules order
+      const stored = localStorage.getItem(`modules_order_${projectCode}`);
+      if (stored) {
+        try {
+          const parsed = JSON.parse(stored);
+          if (Array.isArray(parsed) && parsed.length > 0) {
+            const defaultModules = ["MST", "INV", "PUR", "SLS", "PRD", "AP", "AR", "FIN", "GL", "RPT", "ADM", "BUG"];
+            const merged = [...parsed];
+            defaultModules.forEach((m) => {
+              if (!merged.includes(m)) {
+                merged.push(m);
+              }
+            });
+            setModules(merged);
+          }
+        } catch (e) {
+          console.error("Failed to parse modules order from localStorage", e);
+        }
+      }
     }
   }, []);
 
@@ -296,6 +320,40 @@ export default function TasksPage() {
     : Array.from(new Set(tasks.map((t) => t.phase).filter(Boolean))) as string[];
 
   const getUserName = (userId: string | null) => users.find((u) => u.id === userId)?.name || "Unassigned";
+
+  // Drag and Drop handlers
+  const handleDragStart = (e: React.DragEvent, index: number) => {
+    setDraggedIndex(index);
+    e.dataTransfer.effectAllowed = "move";
+  };
+
+  const handleDragOver = (e: React.DragEvent, index: number) => {
+    e.preventDefault();
+    if (dragOverIndex !== index) {
+      setDragOverIndex(index);
+    }
+  };
+
+  const handleDrop = (e: React.DragEvent, targetIndex: number) => {
+    e.preventDefault();
+    if (draggedIndex === null || draggedIndex === targetIndex) {
+      setDragOverIndex(null);
+      return;
+    }
+
+    const reorderedModules = [...modules];
+    const [draggedItem] = reorderedModules.splice(draggedIndex, 1);
+    reorderedModules.splice(targetIndex, 0, draggedItem);
+    
+    setModules(reorderedModules);
+    localStorage.setItem(`modules_order_${projectCode}`, JSON.stringify(reorderedModules));
+    setDragOverIndex(null);
+  };
+
+  const handleDragEnd = () => {
+    setDraggedIndex(null);
+    setDragOverIndex(null);
+  };
 
   // Summary by module — only count non-archived tasks so chip numbers match the board
   const moduleSummary = modules.map((mod) => {
@@ -380,9 +438,14 @@ export default function TasksPage() {
 
         {/* Module Summary */}
         <div className="flex flex-row gap-2 overflow-x-auto pb-2 flex-nowrap flex-shrink-0 scrollbar-thin select-none">
-          {moduleSummary.map((s: any) => (
+          {moduleSummary.map((s: any, index: number) => (
             <button
               key={s.name}
+              draggable
+              onDragStart={(e) => handleDragStart(e, index)}
+              onDragOver={(e) => handleDragOver(e, index)}
+              onDragEnd={handleDragEnd}
+              onDrop={(e) => handleDrop(e, index)}
               onClick={() => {
                 if (filterEpic === s.name) {
                   // deselect
@@ -395,10 +458,14 @@ export default function TasksPage() {
                   setFilterPriority("");
                 }
               }}
-              className={`h-14 w-28 flex-shrink-0 rounded-xl border text-left px-3 py-2 transition-all flex flex-col justify-between ${
+              className={`h-14 w-28 flex-shrink-0 rounded-xl border text-left px-3 py-2 transition-all flex flex-col justify-between cursor-grab active:cursor-grabbing ${
                 filterEpic === s.name 
                   ? "bg-blue-600 border-blue-600 text-white font-bold shadow-md shadow-blue-500/25 scale-[1.01]" 
                   : "bg-white border-slate-200 text-slate-700 hover:bg-slate-50 hover:border-slate-350"
+              } ${
+                draggedIndex === index ? "opacity-40 border-dashed border-slate-400 bg-slate-100" : ""
+              } ${
+                dragOverIndex === index && draggedIndex !== index ? "border-blue-500 border-2 bg-blue-50/30 scale-95" : ""
               }`}
             >
               <div className="flex items-center justify-between w-full">
@@ -700,7 +767,9 @@ export default function TasksPage() {
                   if (modules.includes(cleaned)) {
                     setAddModuleError("Modul sudah ada!");
                   } else {
-                    setModules((prev) => [...prev, cleaned]);
+                    const newModules = [...modules, cleaned];
+                    setModules(newModules);
+                    localStorage.setItem(`modules_order_${projectCode}`, JSON.stringify(newModules));
                     setAddModuleOpen(false);
                     setNewModuleName("");
                     setAddModuleError("");
