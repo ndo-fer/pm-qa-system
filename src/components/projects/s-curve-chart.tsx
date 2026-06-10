@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { ResponsiveContainer, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend } from "recharts";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -12,6 +12,12 @@ interface SCurveChartProps {
 
 export function SCurveChart({ sCurveGroup }: SCurveChartProps) {
   const [view, setView] = useState<"weekly" | "monthly" | "overall">("overall");
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
 
   // Format percentage helper
   const formatPercent = (value: number) => `${Math.round(value * 100)}%`;
@@ -131,6 +137,26 @@ export function SCurveChart({ sCurveGroup }: SCurveChartProps) {
 
   const xAxisKey = view === "weekly" ? "day" : "week";
   const tickFormatter = view === "weekly" ? (v: any) => v : (v: any) => `W${v}`;
+
+  if (!mounted) {
+    return (
+      <Card className="col-span-1 lg:col-span-3 shadow-md border-slate-200 overflow-visible animate-pulse">
+        <CardHeader className="flex flex-row items-center justify-between pb-2">
+          <div className="space-y-1">
+            <CardTitle className="text-base font-bold text-slate-350">Project S-Curve Tracking</CardTitle>
+            <CardDescription className="text-xs text-slate-200">
+              Loading chart...
+            </CardDescription>
+          </div>
+        </CardHeader>
+        <CardContent>
+          <div className="w-full h-[260px] bg-slate-50/50 rounded-lg flex items-center justify-center text-xs text-slate-400">
+            Initializing chart viewport...
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
 
   return (
     <Card className="col-span-1 lg:col-span-3 shadow-md border-slate-200 overflow-visible">

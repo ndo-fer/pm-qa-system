@@ -10,41 +10,51 @@ export async function GET() {
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const activeProjectId = session.user.projectId;
-
-  const projectCount = await db.select({ count: count() }).from(projectMembers).where(eq(projectMembers.userId, session.user.id));
-  const taskCount = await db.select({ count: count() }).from(tasks).where(eq(tasks.projectId, activeProjectId));
-  const doneTasks = await db.select({ count: count() }).from(tasks).where(and(eq(tasks.projectId, activeProjectId), eq(tasks.status, "done")));
-  const inProgressTasks = await db.select({ count: count() }).from(tasks).where(and(eq(tasks.projectId, activeProjectId), eq(tasks.status, "in_progress")));
-  
-  const qaCountResult = await db
-    .select({ count: count() })
-    .from(testCases)
-    .innerJoin(testPlans, eq(testCases.testPlanId, testPlans.id))
-    .where(eq(testPlans.projectId, activeProjectId));
-  const qaCount = qaCountResult[0]?.count || 0;
-
-  const passedQAResult = await db
-    .select({ count: count() })
-    .from(testCases)
-    .innerJoin(testPlans, eq(testCases.testPlanId, testPlans.id))
-    .where(and(eq(testPlans.projectId, activeProjectId), eq(testCases.status, "pass")));
-  const passedQA = passedQAResult[0]?.count || 0;
-
-  const failedQAResult = await db
-    .select({ count: count() })
-    .from(testCases)
-    .innerJoin(testPlans, eq(testCases.testPlanId, testPlans.id))
-    .where(and(eq(testPlans.projectId, activeProjectId), eq(testCases.status, "fail")));
-  const failedQA = failedQAResult[0]?.count || 0;
-
-  const planCount = await db.select({ count: count() }).from(testPlans).where(eq(testPlans.projectId, activeProjectId));
-  const milestoneCount = await db.select({ count: count() }).from(milestones).where(eq(milestones.projectId, activeProjectId));
+  if (!activeProjectId) {
+    return NextResponse.json({
+      projects: 0,
+      totalTasks: 0,
+      doneTasks: 0,
+      inProgressTasks: 0,
+      overdueTasks: 0,
+      totalQA: 0,
+      passedQA: 0,
+      failedQA: 0,
+      testPlans: 0,
+      milestones: 0,
+      sCurve: [],
+    });
+  }
 
   const today = new Date().toISOString().split("T")[0];
-  const overdueTasks = await db
-    .select({ count: count() })
-    .from(tasks)
-    .where(and(eq(tasks.projectId, activeProjectId), eq(tasks.status, "todo"), lt(tasks.dueDate, today)));
+
+  const [
+    projectCount,
+    taskCount,
+    doneTasks,
+    inProgressTasks,
+    qaCountResult,
+    passedQAResult,
+    failedQAResult,
+    planCount,
+    milestoneCount,
+    overdueTasks
+  ] = await Promise.all([
+    db.select({ count: count() }).from(projectMembers).where(eq(projectMembers.userId, session.user.id)),
+    db.select({ count: count() }).from(tasks).where(eq(tasks.projectId, activeProjectId)),
+    db.select({ count: count() }).from(tasks).where(and(eq(tasks.projectId, activeProjectId), eq(tasks.status, "done"))),
+    db.select({ count: count() }).from(tasks).where(and(eq(tasks.projectId, activeProjectId), eq(tasks.status, "in_progress"))),
+    db.select({ count: count() }).from(testCases).innerJoin(testPlans, eq(testCases.testPlanId, testPlans.id)).where(eq(testPlans.projectId, activeProjectId)),
+    db.select({ count: count() }).from(testCases).innerJoin(testPlans, eq(testCases.testPlanId, testPlans.id)).where(and(eq(testPlans.projectId, activeProjectId), eq(testCases.status, "pass"))),
+    db.select({ count: count() }).from(testCases).innerJoin(testPlans, eq(testCases.testPlanId, testPlans.id)).where(and(eq(testPlans.projectId, activeProjectId), eq(testCases.status, "fail"))),
+    db.select({ count: count() }).from(testPlans).where(eq(testPlans.projectId, activeProjectId)),
+    db.select({ count: count() }).from(milestones).where(eq(milestones.projectId, activeProjectId)),
+    db.select({ count: count() }).from(tasks).where(and(eq(tasks.projectId, activeProjectId), eq(tasks.status, "todo"), lt(tasks.dueDate, today)))
+  ]);
+
+  const qaCount = qaCountResult[0]?.count || 0;
+  const passedQA = passedQAResult[0]?.count || 0;
+  const failedQA = failedQAResult[0]?.count || 0;
 
   // Get S-Curve data from active project
   const project = await db.select().from(projects).where(eq(projects.id, activeProjectId)).limit(1);

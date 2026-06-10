@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/auth";
 import { db } from "@/db";
-import { users, NewUser } from "@/db/schema";
+import { users, NewUser, projectMembers, projects } from "@/db/schema";
 import { eq } from "drizzle-orm";
 import { randomUUID } from "crypto";
 import bcrypt from "bcryptjs";
@@ -26,25 +26,63 @@ export async function POST(request: Request) {
   const session = await getServerSession(authOptions);
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
+  // Only Admin or PM can create new users
+  if (session.user.role !== "admin" && session.user.role !== "pm") {
+    return NextResponse.json({ error: "Access denied" }, { status: 403 });
+  }
+
   const body = await request.json();
+  if (!body.email || !body.password || !body.name) {
+    return NextResponse.json({ error: "Missing required fields" }, { status: 400 });
+  }
+
+  // Check if user already exists
+  const existingUser = await db.select().from(users).where(eq(users.email, body.email)).limit(1);
+  if (existingUser.length > 0) {
+    return NextResponse.json({ error: "User already exists with this email" }, { status: 400 });
+  }
+
   const passwordHash = await bcrypt.hash(body.password, 10);
+  const userRole = body.role || "developer";
 
   const newUser: NewUser = {
     id: randomUUID(),
     name: body.name,
     email: body.email,
     passwordHash,
-    role: body.role || "developer",
+    role: userRole,
   };
 
-  const [created] = await db.insert(users).values(newUser).returning();
-  const { passwordHash: _, ...safeUser } = created;
-  return NextResponse.json(safeUser, { status: 201 });
+  let safeUser: Omit<NewUser, "passwordHash">;
+
+  // Atomically create user and assign to all existing projects
+  await db.transaction(async (tx) => {
+    const [created] = await tx.insert(users).values(newUser).returning();
+    const { passwordHash: _, ...rest } = created;
+    safeUser = rest;
+
+    const allProjects = await tx.select().from(projects);
+    for (const p of allProjects) {
+      await tx.insert(projectMembers).values({
+        id: randomUUID(),
+        projectId: p.id,
+        userId: created.id,
+        role: userRole,
+      });
+    }
+  });
+
+  return NextResponse.json(safeUser!, { status: 201 });
 }
 
 export async function PUT(request: Request) {
   const session = await getServerSession(authOptions);
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
+  // Only Admin or PM can update users
+  if (session.user.role !== "admin" && session.user.role !== "pm") {
+    return NextResponse.json({ error: "Access denied" }, { status: 403 });
+  }
 
   const body = await request.json();
   if (!body.id) return NextResponse.json({ error: "ID required" }, { status: 400 });
@@ -61,8 +99,21 @@ export async function PUT(request: Request) {
     updateData.passwordHash = await bcrypt.hash(body.password, 10);
   }
 
-  const updated = await db.update(users).set(updateData).where(eq(users.id, body.id)).returning();
-  const { passwordHash: _, ...safeUser } = updated[0];
+  let safeUser: any;
+
+  await db.transaction(async (tx) => {
+    const updated = await tx.update(users).set(updateData).where(eq(users.id, body.id)).returning();
+    const { passwordHash: _, ...rest } = updated[0];
+    safeUser = rest;
+
+    // Keep project member roles synchronized with global user roles
+    if (body.role) {
+      await tx.update(projectMembers)
+        .set({ role: body.role })
+        .where(eq(projectMembers.userId, body.id));
+    }
+  });
+
   return NextResponse.json(safeUser);
 }
 
@@ -70,9 +121,20 @@ export async function DELETE(request: Request) {
   const session = await getServerSession(authOptions);
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
+  // Only Admin or PM can delete users
+  if (session.user.role !== "admin" && session.user.role !== "pm") {
+    return NextResponse.json({ error: "Access denied" }, { status: 403 });
+  }
+
   const body = await request.json();
   if (!body.id) return NextResponse.json({ error: "ID required" }, { status: 400 });
 
-  await db.delete(users).where(eq(users.id, body.id));
+  // Atomically delete project memberships first to respect database foreign keys
+  await db.transaction(async (tx) => {
+    await tx.delete(projectMembers).where(eq(projectMembers.userId, body.id));
+    await tx.delete(users).where(eq(users.id, body.id));
+  });
+
   return NextResponse.json({ success: true });
 }
+

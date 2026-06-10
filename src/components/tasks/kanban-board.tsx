@@ -213,7 +213,7 @@ export function KanbanBoard({ tasks, onEdit, onPreview, onRefresh }: KanbanBoard
         return (
           <div 
             key={col.id} 
-            className={`flex flex-col rounded-xl border-2 p-1.5 w-80 min-w-[280px] max-w-[360px] flex-1 max-h-full shadow-sm transition-all duration-200 ${
+            className={`flex flex-col rounded-xl border-2 p-1.5 min-w-[280px] max-w-[480px] flex-1 w-full max-h-full shadow-sm transition-all duration-200 ${
               isHovered 
                 ? "bg-slate-100/95 border-blue-400 border-dashed ring-2 ring-blue-400/10 scale-[1.005]" 
                 : `${col.border} ${col.bg}`

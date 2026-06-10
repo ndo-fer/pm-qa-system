@@ -11,7 +11,8 @@ import { Button } from "@/components/ui/button";
 //
 // We try 3 formats in order for Drive file IDs:
 const buildDriveUrls = (fileId: string) => [
-  `https://lh3.googleusercontent.com/d/${fileId}`,                           // Most reliable for public files
+  `/api/drive/image?fileId=${fileId}`,                                       // Secure backend proxy (handles private files)
+  `https://lh3.googleusercontent.com/d/${fileId}`,                           // Direct link (requires public file)
   `https://drive.google.com/thumbnail?id=${fileId}&sz=w1600`,                // Thumbnail endpoint
   `https://drive.google.com/uc?export=view&id=${fileId}`,                    // Legacy
 ];

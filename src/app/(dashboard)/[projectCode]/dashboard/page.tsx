@@ -13,73 +13,45 @@ import { authOptions } from "@/auth";
 import { redirect } from "next/navigation";
 
 async function getStats(activeProjectId: string, userId: string) {
-  const projectCount = await db
-    .select({ count: count() })
-    .from(projectMembers)
-    .where(eq(projectMembers.userId, userId));
-
-  const taskCount = await db
-    .select({ count: count() })
-    .from(tasks)
-    .where(eq(tasks.projectId, activeProjectId));
-
-  const doneTasks = await db
-    .select({ count: count() })
-    .from(tasks)
-    .where(and(eq(tasks.projectId, activeProjectId), eq(tasks.status, "done")));
-
-  const inProgressTasks = await db
-    .select({ count: count() })
-    .from(tasks)
-    .where(and(eq(tasks.projectId, activeProjectId), eq(tasks.status, "in_progress")));
-
-  const qaCount = await db
-    .select({ count: count() })
-    .from(testCases)
-    .innerJoin(testPlans, eq(testCases.testPlanId, testPlans.id))
-    .where(eq(testPlans.projectId, activeProjectId));
-
-  const passedQA = await db
-    .select({ count: count() })
-    .from(testCases)
-    .innerJoin(testPlans, eq(testCases.testPlanId, testPlans.id))
-    .where(and(eq(testPlans.projectId, activeProjectId), eq(testCases.status, "pass")));
-
-  const failedQA = await db
-    .select({ count: count() })
-    .from(testCases)
-    .innerJoin(testPlans, eq(testCases.testPlanId, testPlans.id))
-    .where(and(eq(testPlans.projectId, activeProjectId), eq(testCases.status, "fail")));
-
-  const planCount = await db
-    .select({ count: count() })
-    .from(testPlans)
-    .where(eq(testPlans.projectId, activeProjectId));
-
-  const milestoneCount = await db
-    .select({ count: count() })
-    .from(milestones)
-    .where(eq(milestones.projectId, activeProjectId));
-
   const today = new Date().toISOString().split("T")[0];
-  const overdueTasks = await db
-    .select({ count: count() })
-    .from(tasks)
-    .where(and(eq(tasks.projectId, activeProjectId), eq(tasks.status, "todo"), lt(tasks.dueDate, today)));
 
-  const sCurveGroup = await calculateSCurveGroup(activeProjectId);
+  const [
+    projectCountResult,
+    taskCountResult,
+    doneTasksResult,
+    inProgressTasksResult,
+    qaCountResult,
+    passedQAResult,
+    failedQAResult,
+    planCountResult,
+    milestoneCountResult,
+    overdueTasksResult,
+    sCurveGroup
+  ] = await Promise.all([
+    db.select({ count: count() }).from(projectMembers).where(eq(projectMembers.userId, userId)),
+    db.select({ count: count() }).from(tasks).where(eq(tasks.projectId, activeProjectId)),
+    db.select({ count: count() }).from(tasks).where(and(eq(tasks.projectId, activeProjectId), eq(tasks.status, "done"))),
+    db.select({ count: count() }).from(tasks).where(and(eq(tasks.projectId, activeProjectId), eq(tasks.status, "in_progress"))),
+    db.select({ count: count() }).from(testCases).innerJoin(testPlans, eq(testCases.testPlanId, testPlans.id)).where(eq(testPlans.projectId, activeProjectId)),
+    db.select({ count: count() }).from(testCases).innerJoin(testPlans, eq(testCases.testPlanId, testPlans.id)).where(and(eq(testPlans.projectId, activeProjectId), eq(testCases.status, "pass"))),
+    db.select({ count: count() }).from(testCases).innerJoin(testPlans, eq(testCases.testPlanId, testPlans.id)).where(and(eq(testPlans.projectId, activeProjectId), eq(testCases.status, "fail"))),
+    db.select({ count: count() }).from(testPlans).where(eq(testPlans.projectId, activeProjectId)),
+    db.select({ count: count() }).from(milestones).where(eq(milestones.projectId, activeProjectId)),
+    db.select({ count: count() }).from(tasks).where(and(eq(tasks.projectId, activeProjectId), eq(tasks.status, "todo"), lt(tasks.dueDate, today))),
+    calculateSCurveGroup(activeProjectId),
+  ]);
 
   return {
-    projects: projectCount[0].count,
-    totalTasks: taskCount[0].count,
-    doneTasks: doneTasks[0].count,
-    inProgressTasks: inProgressTasks[0].count,
-    overdueTasks: overdueTasks[0].count,
-    totalQA: qaCount[0].count,
-    passedQA: passedQA[0].count,
-    failedQA: failedQA[0].count,
-    testPlans: planCount[0].count,
-    milestones: milestoneCount[0].count,
+    projects: projectCountResult[0].count,
+    totalTasks: taskCountResult[0].count,
+    doneTasks: doneTasksResult[0].count,
+    inProgressTasks: inProgressTasksResult[0].count,
+    overdueTasks: overdueTasksResult[0].count,
+    totalQA: qaCountResult[0].count,
+    passedQA: passedQAResult[0].count,
+    failedQA: failedQAResult[0].count,
+    testPlans: planCountResult[0].count,
+    milestones: milestoneCountResult[0].count,
     sCurveGroup,
   };
 }

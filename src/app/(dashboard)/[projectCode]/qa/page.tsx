@@ -108,6 +108,14 @@ export default function QAPage() {
 
   const userRole = (session?.user as any)?.role || "user";
   const isQA = userRole === "qa";
+  const canAccessQA = userRole === "admin" || userRole === "pm" || userRole === "qa";
+
+  // Access guard: redirect unauthorised roles away from this page
+  useEffect(() => {
+    if (session && !canAccessQA) {
+      router.replace(`/${projectCode}/dashboard`);
+    }
+  }, [session, canAccessQA, router, projectCode]);
 
   const [testPlans, setTestPlans] = useState<TestPlan[]>([]);
   const [testCases, setTestCases] = useState<TestCase[]>([]);
@@ -552,7 +560,7 @@ export default function QAPage() {
         setExecStatus("fail");
         setExecActualResult(errMsg);
         setExecNotes(`Endpoint failed: ${url}\nResponse status: ${status}`);
-        if (isQA) {
+        if ((session?.user as any)?.role === "qa") {
           setCreateDefect(true);
         }
       }
@@ -562,7 +570,7 @@ export default function QAPage() {
       setExecStatus("fail");
       setExecActualResult(errMsg);
       setExecNotes(`Endpoint failed: ${url}\nDetails: ${err.message || err}`);
-      if (isQA) {
+      if ((session?.user as any)?.role === "qa") {
         setCreateDefect(true);
       }
     } finally {

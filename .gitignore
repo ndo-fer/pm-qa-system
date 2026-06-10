@@ -55,3 +55,7 @@ next-env.d.ts
 /scratch/
 /scratch/multi_project_planning.md
 /artifacts/
+
+# Playwright test output
+/playwright-report/
+/test-results/

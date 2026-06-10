@@ -119,87 +119,109 @@ export async function syncGoogleSheets(options?: SyncOptions) {
     const processedTaskIds = new Set<string>();
 
     // 3. Reconcile rows from Sheet into DB
-    for (const row of dataRows) {
-      if (row.length === 0) continue;
+    await db.transaction(async (tx) => {
+      for (const row of dataRows) {
+        if (row.length === 0) continue;
 
-      const id = row[0]?.trim();
-      const projectId = row[1]?.trim();
-      const resolvedProjectId = allProjects.some(p => p.id === projectId) ? projectId : defaultProject.id;
-      const taskCode = row[2]?.trim() || null;
-      const title = row[3]?.trim();
-      const epic = row[4]?.trim() || null;
-      const feature = row[5]?.trim() || null;
-      const taskType = row[6]?.trim() || null;
-      let status = (row[7]?.trim() || "todo").toLowerCase();
-      let priority = (row[8]?.trim() || "medium").toLowerCase();
-      const assigneeEmail = row[9]?.trim()?.toLowerCase();
-      const dueDate = row[10]?.trim() || null;
-      const progress = parseInt(row[11]?.trim() || "0", 10) || 0;
-      const blocker = row[12]?.trim() || null;
-      const phase = row[13]?.trim() || null;
+        const id = row[0]?.trim();
+        const projectId = row[1]?.trim();
+        const resolvedProjectId = allProjects.some(p => p.id === projectId) ? projectId : defaultProject.id;
+        const taskCode = row[2]?.trim() || null;
+        const title = row[3]?.trim();
+        const epic = row[4]?.trim() || null;
+        const feature = row[5]?.trim() || null;
+        const taskType = row[6]?.trim() || null;
+        let status = (row[7]?.trim() || "todo").toLowerCase();
+        let priority = (row[8]?.trim() || "medium").toLowerCase();
+        const assigneeEmail = row[9]?.trim()?.toLowerCase();
+        const dueDate = row[10]?.trim() || null;
+        const progress = parseInt(row[11]?.trim() || "0", 10) || 0;
+        const blocker = row[12]?.trim() || null;
+        const phase = row[13]?.trim() || null;
 
-      if (!["todo", "in_progress", "review", "done"].includes(status)) {
-        status = "todo";
-      }
-      if (!["low", "medium", "high", "urgent"].includes(priority)) {
-        priority = "medium";
-      }
+        if (!["todo", "in_progress", "review", "done"].includes(status)) {
+          status = "todo";
+        }
+        if (!["low", "medium", "high", "urgent"].includes(priority)) {
+          priority = "medium";
+        }
 
-      if (!title) continue;
+        if (!title) continue;
 
-      const assigneeId = assigneeEmail ? (emailToUserIdMap[assigneeEmail] || null) : null;
+        const assigneeId = assigneeEmail ? (emailToUserIdMap[assigneeEmail] || null) : null;
 
-      if (id) {
-        const existing = await db.select().from(tasks).where(eq(tasks.id, id));
-        if (existing.length > 0) {
-          const dbTask = existing[0];
-          
-          const statusOrder: Record<string, number> = { todo: 0, in_progress: 1, review: 2, done: 3 };
-          const dbStatusVal = statusOrder[dbTask.status || "todo"] ?? 0;
-          const sheetStatusVal = statusOrder[status] ?? 0;
+        if (id) {
+          const existing = await tx.select().from(tasks).where(eq(tasks.id, id));
+          if (existing.length > 0) {
+            const dbTask = existing[0];
+            
+            const statusOrder: Record<string, number> = { todo: 0, in_progress: 1, review: 2, done: 3 };
+            const dbStatusVal = statusOrder[dbTask.status || "todo"] ?? 0;
+            const sheetStatusVal = statusOrder[status] ?? 0;
 
-          // Resolve status/progress conflict: DB takes precedence if it's further along (e.g. done vs todo)
-          const useDbStatus = dbStatusVal > sheetStatusVal;
-          const resolvedStatus = useDbStatus ? dbTask.status : status;
-          const resolvedProgress = useDbStatus ? dbTask.progress : progress;
+            // Resolve status/progress conflict: DB takes precedence if it's further along (e.g. done vs todo)
+            const useDbStatus = dbStatusVal > sheetStatusVal;
+            const resolvedStatus = useDbStatus ? dbTask.status : status;
+            const resolvedProgress = useDbStatus ? dbTask.progress : progress;
 
-          const hasChanges =
-            dbTask.title !== title ||
-            dbTask.status !== resolvedStatus ||
-            dbTask.priority !== priority ||
-            dbTask.assigneeId !== assigneeId ||
-            dbTask.progress !== resolvedProgress ||
-            dbTask.blocker !== blocker ||
-            dbTask.phase !== phase ||
-            dbTask.epic !== epic ||
-            dbTask.feature !== feature ||
-            dbTask.taskCode !== taskCode ||
-            dbTask.dueDate !== dueDate ||
-            dbTask.projectId !== resolvedProjectId;
+            const hasChanges =
+              dbTask.title !== title ||
+              dbTask.status !== resolvedStatus ||
+              dbTask.priority !== priority ||
+              dbTask.assigneeId !== assigneeId ||
+              dbTask.progress !== resolvedProgress ||
+              dbTask.blocker !== blocker ||
+              dbTask.phase !== phase ||
+              dbTask.epic !== epic ||
+              dbTask.feature !== feature ||
+              dbTask.taskCode !== taskCode ||
+              dbTask.dueDate !== dueDate ||
+              dbTask.projectId !== resolvedProjectId;
 
-          if (hasChanges) {
-            await db.update(tasks)
-              .set({
-                projectId: resolvedProjectId,
-                taskCode,
-                title,
-                epic,
-                feature,
-                taskType,
-                status: resolvedStatus as any,
-                priority: priority as any,
-                assigneeId,
-                dueDate,
-                progress: resolvedProgress,
-                blocker,
-                phase,
-                updatedAt: new Date().toISOString()
-              })
-              .where(eq(tasks.id, id));
+            if (hasChanges) {
+              await tx.update(tasks)
+                .set({
+                  projectId: resolvedProjectId,
+                  taskCode,
+                  title,
+                  epic,
+                  feature,
+                  taskType,
+                  status: resolvedStatus as any,
+                  priority: priority as any,
+                  assigneeId,
+                  dueDate,
+                  progress: resolvedProgress,
+                  blocker,
+                  phase,
+                  updatedAt: new Date().toISOString()
+                })
+                .where(eq(tasks.id, id));
+            }
+          } else {
+            const newTask: NewTask = {
+              id,
+              projectId: resolvedProjectId,
+              taskCode,
+              title,
+              epic,
+              feature,
+              taskType,
+              status: status as any,
+              priority: priority as any,
+              assigneeId,
+              dueDate,
+              progress,
+              blocker,
+              phase
+            };
+            await tx.insert(tasks).values(newTask);
           }
+          processedTaskIds.add(id);
         } else {
+          const newId = randomUUID();
           const newTask: NewTask = {
-            id,
+            id: newId,
             projectId: resolvedProjectId,
             taskCode,
             title,
@@ -214,31 +236,12 @@ export async function syncGoogleSheets(options?: SyncOptions) {
             blocker,
             phase
           };
-          await db.insert(tasks).values(newTask);
+          await tx.insert(tasks).values(newTask);
+          processedTaskIds.add(newId);
         }
-        processedTaskIds.add(id);
-      } else {
-        const newId = randomUUID();
-        const newTask: NewTask = {
-          id: newId,
-          projectId: resolvedProjectId,
-          taskCode,
-          title,
-          epic,
-          feature,
-          taskType,
-          status: status as any,
-          priority: priority as any,
-          assigneeId,
-          dueDate,
-          progress,
-          blocker,
-          phase
-        };
-        await db.insert(tasks).values(newTask);
-        processedTaskIds.add(newId);
       }
-    }
+    });
+
 
     // 4. Fetch latest tasks from DB
     latestTasks = await db.select().from(tasks);
@@ -485,64 +488,67 @@ export async function syncGoogleSheets(options?: SyncOptions) {
     const tpRows = tpResponse.data.values || [];
     const tpDataRows = tpRows.slice(1);
 
-    for (const row of tpDataRows) {
-      if (row.length === 0) continue;
+    await db.transaction(async (tx) => {
+      for (const row of tpDataRows) {
+        if (row.length === 0) continue;
 
-      const id = row[0]?.trim();
-      const projectId = row[1]?.trim();
-      const resolvedProjectId = allProjects.some(p => p.id === projectId) ? projectId : defaultProject.id;
-      const name = row[2]?.trim();
-      const moduleName = row[3]?.trim();
-      let status = (row[4]?.trim() || "draft").toLowerCase();
+        const id = row[0]?.trim();
+        const projectId = row[1]?.trim();
+        const resolvedProjectId = allProjects.some(p => p.id === projectId) ? projectId : defaultProject.id;
+        const name = row[2]?.trim();
+        const moduleName = row[3]?.trim();
+        let status = (row[4]?.trim() || "draft").toLowerCase();
 
-      if (!["draft", "active", "completed"].includes(status)) {
-        status = "draft";
-      }
+        if (!["draft", "active", "completed"].includes(status)) {
+          status = "draft";
+        }
 
-      if (!name || !moduleName) continue;
+        if (!name || !moduleName) continue;
 
-      if (id) {
-        const existing = await db.select().from(testPlans).where(eq(testPlans.id, id));
-        if (existing.length > 0) {
-          const dbPlan = existing[0];
-          const hasChanges =
-            dbPlan.name !== name ||
-            dbPlan.module !== moduleName ||
-            dbPlan.status !== status ||
-            dbPlan.projectId !== resolvedProjectId;
+        if (id) {
+          const existing = await tx.select().from(testPlans).where(eq(testPlans.id, id));
+          if (existing.length > 0) {
+            const dbPlan = existing[0];
+            const hasChanges =
+              dbPlan.name !== name ||
+              dbPlan.module !== moduleName ||
+              dbPlan.status !== status ||
+              dbPlan.projectId !== resolvedProjectId;
 
-          if (hasChanges) {
-            await db.update(testPlans)
-              .set({
-                projectId: resolvedProjectId,
-                name,
-                module: moduleName as any,
-                status: status as any,
-              })
-              .where(eq(testPlans.id, id));
+            if (hasChanges) {
+              await tx.update(testPlans)
+                .set({
+                  projectId: resolvedProjectId,
+                  name,
+                  module: moduleName as any,
+                  status: status as any,
+                })
+                .where(eq(testPlans.id, id));
+            }
+          } else {
+            const newPlan: NewTestPlan = {
+              id,
+              projectId: resolvedProjectId,
+              name,
+              module: moduleName as any,
+              status: status as any,
+            };
+            await tx.insert(testPlans).values(newPlan);
           }
         } else {
+          const newId = randomUUID();
           const newPlan: NewTestPlan = {
-            id,
+            id: newId,
             projectId: resolvedProjectId,
             name,
             module: moduleName as any,
             status: status as any,
           };
-          await db.insert(testPlans).values(newPlan);
+          await tx.insert(testPlans).values(newPlan);
         }
-      } else {
-        const newId = randomUUID();
-        const newPlan: NewTestPlan = {
-          id: newId,
-          projectId: resolvedProjectId,
-          name,
-          module: moduleName as any,
-          status: status as any,
-        };
-        await db.insert(testPlans).values(newPlan);
       }
-    }
+    });
+
 
     // 11. Rewrite Test Plans sheet with latest DB state
     latestTestPlans = await db.select().from(testPlans);
@@ -619,82 +625,102 @@ export async function syncGoogleSheets(options?: SyncOptions) {
     const tcRows = tcResponse.data.values || [];
     const tcDataRows = tcRows.slice(1);
 
-    for (const row of tcDataRows) {
-      if (row.length === 0) continue;
+    await db.transaction(async (tx) => {
+      for (const row of tcDataRows) {
+        if (row.length === 0) continue;
 
-      const id = row[0]?.trim();
-      const testPlanId = row[1]?.trim();
-      const caseNumber = row[2]?.trim();
-      const description = row[3]?.trim();
-      const steps = row[4]?.trim() || null;
-      const expectedResult = row[5]?.trim() || null;
-      const actualResult = row[6]?.trim() || null;
-      let status = (row[7]?.trim() || "pending").toLowerCase();
-      const notes = row[8]?.trim() || null;
-      const executedByEmail = row[9]?.trim()?.toLowerCase();
-      const executedAt = row[10]?.trim() || null;
-      const erpRole = row[11]?.trim() || null;
-      const testType = row[12]?.trim() || null;
+        const id = row[0]?.trim();
+        const testPlanId = row[1]?.trim();
+        const caseNumber = row[2]?.trim();
+        const description = row[3]?.trim();
+        const steps = row[4]?.trim() || null;
+        const expectedResult = row[5]?.trim() || null;
+        const actualResult = row[6]?.trim() || null;
+        let status = (row[7]?.trim() || "pending").toLowerCase();
+        const notes = row[8]?.trim() || null;
+        const executedByEmail = row[9]?.trim()?.toLowerCase();
+        const executedAt = row[10]?.trim() || null;
+        const erpRole = row[11]?.trim() || null;
+        const testType = row[12]?.trim() || null;
 
-      if (!["pending", "pass", "fail", "blocked"].includes(status)) {
-        status = "pending";
-      }
+        if (!["pending", "pass", "fail", "blocked"].includes(status)) {
+          status = "pending";
+        }
 
-      if (!caseNumber || !description || !testPlanId) continue;
+        if (!caseNumber || !description || !testPlanId) continue;
 
-      const executedById = executedByEmail ? (emailToUserIdMap[executedByEmail] || null) : null;
+        const executedById = executedByEmail ? (emailToUserIdMap[executedByEmail] || null) : null;
 
-      if (id) {
-        const existing = await db.select().from(testCases).where(eq(testCases.id, id));
-        if (existing.length > 0) {
-          const dbCase = existing[0];
-          
-          const statusOrder: Record<string, number> = { pending: 0, fail: 1, blocked: 2, pass: 3 };
-          const dbStatusVal = statusOrder[dbCase.status || "pending"] ?? 0;
-          const sheetStatusVal = statusOrder[status] ?? 0;
+        if (id) {
+          const existing = await tx.select().from(testCases).where(eq(testCases.id, id));
+          if (existing.length > 0) {
+            const dbCase = existing[0];
+            
+            const statusOrder: Record<string, number> = { pending: 0, fail: 1, blocked: 2, pass: 3 };
+            const dbStatusVal = statusOrder[dbCase.status || "pending"] ?? 0;
+            const sheetStatusVal = statusOrder[status] ?? 0;
 
-          // Resolve status/results conflict: DB takes precedence if it's further along (e.g. pass vs fail)
-          const useDbStatus = dbStatusVal > sheetStatusVal;
-          const resolvedStatus = useDbStatus ? dbCase.status : status;
-          const resolvedActualResult = useDbStatus ? dbCase.actualResult : actualResult;
-          const resolvedNotes = useDbStatus ? dbCase.notes : notes;
-          const resolvedExecutedBy = useDbStatus ? dbCase.executedBy : executedById;
-          const resolvedExecutedAt = useDbStatus ? dbCase.executedAt : executedAt;
+            // Resolve status/results conflict: DB takes precedence if it's further along (e.g. pass vs fail)
+            const useDbStatus = dbStatusVal > sheetStatusVal;
+            const resolvedStatus = useDbStatus ? dbCase.status : status;
+            const resolvedActualResult = useDbStatus ? dbCase.actualResult : actualResult;
+            const resolvedNotes = useDbStatus ? dbCase.notes : notes;
+            const resolvedExecutedBy = useDbStatus ? dbCase.executedBy : executedById;
+            const resolvedExecutedAt = useDbStatus ? dbCase.executedAt : executedAt;
 
-          const hasChanges =
-            dbCase.caseNumber !== caseNumber ||
-            dbCase.description !== description ||
-            dbCase.steps !== steps ||
-            dbCase.expectedResult !== expectedResult ||
-            dbCase.actualResult !== resolvedActualResult ||
-            dbCase.status !== resolvedStatus ||
-            dbCase.notes !== resolvedNotes ||
-            dbCase.executedBy !== resolvedExecutedBy ||
-            dbCase.executedAt !== resolvedExecutedAt ||
-            dbCase.erpRole !== erpRole ||
-            dbCase.testType !== testType;
+            const hasChanges =
+              dbCase.caseNumber !== caseNumber ||
+              dbCase.description !== description ||
+              dbCase.steps !== steps ||
+              dbCase.expectedResult !== expectedResult ||
+              dbCase.actualResult !== resolvedActualResult ||
+              dbCase.status !== resolvedStatus ||
+              dbCase.notes !== resolvedNotes ||
+              dbCase.executedBy !== resolvedExecutedBy ||
+              dbCase.executedAt !== resolvedExecutedAt ||
+              dbCase.erpRole !== erpRole ||
+              dbCase.testType !== testType;
 
-          if (hasChanges) {
-            await db.update(testCases)
-              .set({
-                testPlanId,
-                caseNumber,
-                description,
-                steps,
-                expectedResult,
-                actualResult: resolvedActualResult,
-                status: resolvedStatus as any,
-                notes: resolvedNotes,
-                executedBy: resolvedExecutedBy,
-                executedAt: resolvedExecutedAt,
-                erpRole: erpRole as any,
-                testType: testType as any,
-              })
-              .where(eq(testCases.id, id));
+            if (hasChanges) {
+              await tx.update(testCases)
+                .set({
+                  testPlanId,
+                  caseNumber,
+                  description,
+                  steps,
+                  expectedResult,
+                  actualResult: resolvedActualResult,
+                  status: resolvedStatus as any,
+                  notes: resolvedNotes,
+                  executedBy: resolvedExecutedBy,
+                  executedAt: resolvedExecutedAt,
+                  erpRole: erpRole as any,
+                  testType: testType as any,
+                })
+                .where(eq(testCases.id, id));
+            }
+          } else {
+            const newCase: NewTestCase = {
+              id,
+              testPlanId,
+              caseNumber,
+              description,
+              steps,
+              expectedResult,
+              actualResult,
+              status: status as any,
+              notes,
+              executedBy: executedById,
+              executedAt,
+              erpRole: erpRole as any,
+              testType: testType as any,
+            };
+            await tx.insert(testCases).values(newCase);
           }
         } else {
+          const newId = randomUUID();
           const newCase: NewTestCase = {
-            id,
+            id: newId,
             testPlanId,
             caseNumber,
             description,
@@ -708,28 +734,11 @@ export async function syncGoogleSheets(options?: SyncOptions) {
             erpRole: erpRole as any,
             testType: testType as any,
           };
-          await db.insert(testCases).values(newCase);
+          await tx.insert(testCases).values(newCase);
         }
-      } else {
-        const newId = randomUUID();
-        const newCase: NewTestCase = {
-          id: newId,
-          testPlanId,
-          caseNumber,
-          description,
-          steps,
-          expectedResult,
-          actualResult,
-          status: status as any,
-          notes,
-          executedBy: executedById,
-          executedAt,
-          erpRole: erpRole as any,
-          testType: testType as any,
-        };
-        await db.insert(testCases).values(newCase);
       }
-    }
+    });
+
 
     // 14. Rewrite Test Cases sheet with latest DB state
     latestTestCases = await db.select().from(testCases);

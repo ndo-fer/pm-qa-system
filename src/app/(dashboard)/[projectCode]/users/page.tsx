@@ -20,6 +20,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { useSession } from "next-auth/react";
+import { useRouter } from "next/navigation";
 import { Plus, Pencil, Trash2 } from "lucide-react";
 import { ExportButton } from "@/components/ui/export-button";
 
@@ -39,10 +41,14 @@ const roleLabels: Record<string, string> = {
 };
 
 export default function UsersPage() {
+  const { data: session, status } = useSession();
+  const router = useRouter();
+
   const [users, setUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
   const [editingUser, setEditingUser] = useState<User | null>(null);
+
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -56,8 +62,14 @@ export default function UsersPage() {
   }
 
   useEffect(() => {
-    fetchData();
-  }, []);
+    if (session) {
+      if (session.user.role !== "admin" && session.user.role !== "pm") {
+        router.push(`/${session.user.projectCode}/dashboard`);
+      } else {
+        fetchData();
+      }
+    }
+  }, [session, router]);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -100,8 +112,30 @@ export default function UsersPage() {
     setShowForm(true);
   }
 
+  if (status === "loading") {
+    return (
+      <AppLayout>
+        <div className="flex items-center justify-center h-64 text-gray-500">
+          Loading...
+        </div>
+      </AppLayout>
+    );
+  }
+
+  const isAllowed = session && (session.user.role === "admin" || session.user.role === "pm");
+  if (!isAllowed) {
+    return (
+      <AppLayout>
+        <div className="flex items-center justify-center h-64 text-gray-500 font-medium">
+          Access denied.
+        </div>
+      </AppLayout>
+    );
+  }
+
   return (
     <AppLayout>
+
       <div className="space-y-4">
         <div className="flex items-center justify-between">
           <div>

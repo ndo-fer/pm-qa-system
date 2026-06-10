@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/auth";
 import { db } from "@/db";
-import { milestones, projects } from "@/db/schema";
+import { milestones, projects, projectMembers } from "@/db/schema";
 import { eq, asc, and } from "drizzle-orm";
 
 export async function GET(request: Request) {
@@ -23,6 +23,14 @@ export async function GET(request: Request) {
     }
   }
 
+  // Verify project membership
+  const member = await db
+    .select()
+    .from(projectMembers)
+    .where(and(eq(projectMembers.projectId, targetProjectId), eq(projectMembers.userId, session.user.id)))
+    .limit(1);
+  if (member.length === 0) return NextResponse.json({ error: "Access denied" }, { status: 403 });
+
   const allMilestones = await db
     .select()
     .from(milestones)
@@ -30,4 +38,5 @@ export async function GET(request: Request) {
     .orderBy(asc(milestones.startDate));
   return NextResponse.json(allMilestones);
 }
+
 

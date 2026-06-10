@@ -25,13 +25,20 @@ export function Sidebar() {
   const projectCode = params?.projectCode as string;
   const currentProjectCode = projectCode || session?.user?.projectCode || "ERP-PM";
 
+  const userRole = session?.user?.role;
+  const canAccessQA = userRole === "admin" || userRole === "pm" || userRole === "qa";
+
   const navItems = [
     { href: `/${currentProjectCode}/dashboard`, label: "Dashboard", icon: LayoutDashboard },
     { href: `/${currentProjectCode}/projects`, label: "Projects", icon: FolderKanban },
     { href: `/${currentProjectCode}/tasks`, label: "Tasks", icon: CheckSquare },
-    { href: `/${currentProjectCode}/qa`, label: "QA Testing", icon: TestTube },
-    { href: `/${currentProjectCode}/users`, label: "Users", icon: Users },
+    ...(canAccessQA ? [{ href: `/${currentProjectCode}/qa`, label: "QA Testing", icon: TestTube }] : []),
   ];
+
+  if (userRole === "admin" || userRole === "pm") {
+    navItems.push({ href: `/${currentProjectCode}/users`, label: "Users", icon: Users });
+  }
+
 
   return (
     <aside

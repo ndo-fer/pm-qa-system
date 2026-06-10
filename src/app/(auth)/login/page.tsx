@@ -58,6 +58,7 @@ export default function LoginPage() {
             <div className="space-y-2">
               <label className="text-sm font-medium">Email</label>
               <Input
+                id="email"
                 type="email"
                 placeholder="user@erp.local"
                 value={email}
@@ -68,6 +69,7 @@ export default function LoginPage() {
             <div className="space-y-2">
               <label className="text-sm font-medium">Password</label>
               <Input
+                id="password"
                 type="password"
                 placeholder="••••••••"
                 value={password}
