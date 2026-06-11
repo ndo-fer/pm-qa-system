@@ -1,6 +1,7 @@
+/* eslint-disable react-hooks/set-state-in-effect */
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useSession } from "next-auth/react";
 import { useParams, useRouter } from "next/navigation";
 import { AppLayout } from "@/components/layout/app-layout";
@@ -38,7 +39,6 @@ import {
   AlertCircle, 
   ChevronRight, 
   Search, 
-  Filter, 
   Play, 
   Bug, 
   AlertTriangle, 
@@ -47,7 +47,6 @@ import {
   HelpCircle,
   FileText,
   Clock,
-  Layers,
   ArrowLeft,
   Activity,
   ListTodo,
@@ -80,7 +79,8 @@ interface TestCase {
   executedAt?: string | null;
   erpRole?: string | null;
   testType?: string | null;
-  loginCredentials?: any;
+  loginCredentials?: Record<string, unknown> | null;
+  attachmentUrl?: string | null;
 }
 
 interface Project {
@@ -100,13 +100,45 @@ const moduleToEpicMap: Record<string, string> = {
   "Kinerja": "RPT",
 };
 
+const getCredentialsForRole = (role: string): string => {
+  const credentials: Record<string, unknown> = {
+    administrator: {
+      type: "single",
+      username: "PDJService",
+      password: "pdj123",
+      role: "administrator"
+    },
+    top_user: {
+      type: "single",
+      username: "K009",
+      password: "123456",
+      role: "top_user"
+    },
+    user: {
+      type: "single",
+      username: "K010",
+      password: "12345",
+      role: "user"
+    },
+    matrix: {
+      type: "matrix",
+      scenarios: [
+        { role: "administrator", username: "PDJService", password: "pdj123" },
+        { role: "top_user", username: "K009", password: "123456" },
+        { role: "user", username: "K010", password: "12345" }
+      ]
+    }
+  };
+  return JSON.stringify(credentials[role] || credentials.matrix, null, 2);
+};
+
 export default function QAPage() {
   const { data: session } = useSession();
   const params = useParams();
   const router = useRouter();
   const projectCode = params?.projectCode as string;
 
-  const userRole = (session?.user as any)?.role || "user";
+  const userRole = (session?.user as { role?: string })?.role || "user";
   const isQA = userRole === "qa";
   const canAccessQA = userRole === "admin" || userRole === "pm" || userRole === "qa";
 
@@ -139,7 +171,6 @@ export default function QAPage() {
   // New Plan fields
   const [newPlanName, setNewPlanName] = useState("");
   const [newPlanModule, setNewPlanModule] = useState("");
-  const [newPlanProject, setNewPlanProject] = useState("");
 
   // New Case fields
   const [newCaseNumber, setNewCaseNumber] = useState("");
@@ -155,7 +186,6 @@ export default function QAPage() {
   const [showEditPlan, setShowEditPlan] = useState(false);
   const [editPlanName, setEditPlanName] = useState("");
   const [editPlanModule, setEditPlanModule] = useState("");
-  const [editPlanProject, setEditPlanProject] = useState("");
 
   // Edit Case state
   const [editingCase, setEditingCase] = useState<TestCase | null>(null);
@@ -182,7 +212,7 @@ export default function QAPage() {
   const [syncing, setSyncing] = useState(false);
   const [lastSyncedAt, setLastSyncedAt] = useState<string | null>(null);
 
-  async function fetchData() {
+  const fetchData = useCallback(async () => {
     setLoading(true);
     try {
       const plansUrl = projectCode ? `/api/test-plans?projectCode=${projectCode}` : "/api/test-plans";
@@ -200,7 +230,7 @@ export default function QAPage() {
     } finally {
       setLoading(false);
     }
-  }
+  }, [projectCode]);
 
   async function handleSyncSheets() {
     setSyncing(true);
@@ -235,13 +265,13 @@ export default function QAPage() {
         setSelectedPlan(planIdParam);
       }
     }
-  }, []);
+  }, [fetchData]);
 
   useEffect(() => {
     if (newCaseErpRole && !newCaseLoginCreds) {
       setNewCaseLoginCreds(getCredentialsForRole(newCaseErpRole));
     }
-  }, [newCaseErpRole]);
+  }, [newCaseErpRole, newCaseLoginCreds]);
 
   async function createPlan() {
     if (!newPlanName || !newPlanModule) return;
@@ -288,7 +318,6 @@ export default function QAPage() {
     setEditingPlan(plan);
     setEditPlanName(plan.name);
     setEditPlanModule(plan.module);
-    setEditPlanProject(plan.projectId);
     setShowEditPlan(true);
   }
 
@@ -425,7 +454,7 @@ export default function QAPage() {
     setExecStatus(tc.status);
     setExecActualResult(tc.actualResult || "");
     setExecNotes(tc.notes || "");
-    setExecAttachmentUrl((tc as any).attachmentUrl || "");
+    setExecAttachmentUrl(tc.attachmentUrl || "");
     setCreateDefect(false);
     setCheckedSteps({});
     setTestError(null);
@@ -469,38 +498,6 @@ export default function QAPage() {
     if (text.includes("area") && !text.includes("controlling")) return "MasArea";
     
     return null;
-  };
-
-  const getCredentialsForRole = (role: string): string => {
-    const credentials: Record<string, any> = {
-      administrator: {
-        type: "single",
-        username: "PDJService",
-        password: "pdj123",
-        role: "administrator"
-      },
-      top_user: {
-        type: "single",
-        username: "K009",
-        password: "123456",
-        role: "top_user"
-      },
-      user: {
-        type: "single",
-        username: "K010",
-        password: "12345",
-        role: "user"
-      },
-      matrix: {
-        type: "matrix",
-        scenarios: [
-          { role: "administrator", username: "PDJService", password: "pdj123" },
-          { role: "top_user", username: "K009", password: "123456" },
-          { role: "user", username: "K010", password: "12345" }
-        ]
-      }
-    };
-    return JSON.stringify(credentials[role] || credentials.matrix, null, 2);
   };
 
   const runLiveApiTest = async () => {
@@ -560,17 +557,17 @@ export default function QAPage() {
         setExecStatus("fail");
         setExecActualResult(errMsg);
         setExecNotes(`Endpoint failed: ${url}\nResponse status: ${status}`);
-        if ((session?.user as any)?.role === "qa") {
+        if ((session?.user as { role?: string })?.role === "qa") {
           setCreateDefect(true);
         }
       }
-    } catch (err: any) {
-      const errMsg = `[Network Error] Could not connect to the API server: ${err.message || err}`;
+    } catch (err) {
+      const errMsg = `[Network Error] Could not connect to the API server: ${(err as Error).message || String(err)}`;
       setTestError(errMsg);
       setExecStatus("fail");
       setExecActualResult(errMsg);
-      setExecNotes(`Endpoint failed: ${url}\nDetails: ${err.message || err}`);
-      if ((session?.user as any)?.role === "qa") {
+      setExecNotes(`Endpoint failed: ${url}\nDetails: ${(err as Error).message || String(err)}`);
+      if ((session?.user as { role?: string })?.role === "qa") {
         setCreateDefect(true);
       }
     } finally {
@@ -1353,21 +1350,35 @@ export default function QAPage() {
                       <ListTodo className="w-3.5 h-3.5 text-slate-400" />
                       <span>Execution Checklist Steps</span>
                     </h4>
-                    <div className="space-y-1.5 max-h-56 overflow-y-auto pr-1">
-                      {stepsArray.map((step, idx) => (
-                        <label key={idx} className="flex items-start gap-2.5 p-2 rounded-lg hover:bg-slate-50 cursor-pointer transition-colors border border-transparent hover:border-slate-100">
-                          <input
-                            type="checkbox"
-                            checked={!!checkedSteps[idx]}
-                            onChange={(e) => setCheckedSteps({ ...checkedSteps, [idx]: e.target.checked })}
-                            className="mt-0.5 h-4 w-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500"
-                          />
-                          <span className={`text-xs ${checkedSteps[idx] ? "line-through text-slate-400 font-medium" : "text-slate-700 font-medium"}`}>
-                            {step}
-                          </span>
-                        </label>
-                      ))}
-                    </div>
+                      {stepsArray.map((step, idx) => {
+                        const isHeader = step.endsWith(":") || 
+                                         step.startsWith("👑") || 
+                                         step.startsWith("👤") || 
+                                         step.startsWith("⭐") || 
+                                         step.startsWith("⭐️") || 
+                                         step.includes("Scenarios") ||
+                                         step.includes("Role");
+                        if (isHeader) {
+                          return (
+                            <div key={idx} className="text-xs font-bold text-slate-800 pt-3 pb-1 first:pt-0 border-b border-slate-100/70 mb-1.5 mt-2 first:mt-0 text-slate-900">
+                              {step}
+                            </div>
+                          );
+                        }
+                        return (
+                          <label key={idx} className="flex items-start gap-2.5 p-2 rounded-lg hover:bg-slate-50 cursor-pointer transition-colors border border-transparent hover:border-slate-100">
+                            <input
+                              type="checkbox"
+                              checked={!!checkedSteps[idx]}
+                              onChange={(e) => setCheckedSteps({ ...checkedSteps, [idx]: e.target.checked })}
+                              className="mt-0.5 h-4 w-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500"
+                            />
+                            <span className={`text-xs ${checkedSteps[idx] ? "line-through text-slate-400 font-medium" : "text-slate-700 font-medium"}`}>
+                              {step}
+                            </span>
+                          </label>
+                        );
+                      })}
                   </div>
                 )}
 

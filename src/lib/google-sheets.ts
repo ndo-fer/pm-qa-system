@@ -1,7 +1,7 @@
 import { google } from "googleapis";
 import { db } from "@/db";
 import { tasks, users, projects, milestones, testPlans, testCases, NewTask, NewTestPlan, NewTestCase } from "@/db/schema";
-import { eq } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
 import { randomUUID } from "crypto";
 import { calculateSCurve } from "./s-curve";
 
@@ -118,129 +118,135 @@ export async function syncGoogleSheets(options?: SyncOptions) {
 
     const processedTaskIds = new Set<string>();
 
+    // Fetch existing tasks from DB once before transaction to resolve N+1 queries
+    const existingDbTasks = await db.select().from(tasks);
+    const existingTasksMap = new Map(existingDbTasks.map(t => [t.id, t]));
+
+    const tasksToUpsert: NewTask[] = [];
+
     // 3. Reconcile rows from Sheet into DB
-    await db.transaction(async (tx) => {
-      for (const row of dataRows) {
-        if (row.length === 0) continue;
+    for (const row of dataRows) {
+      if (row.length === 0) continue;
 
-        const id = row[0]?.trim();
-        const projectId = row[1]?.trim();
-        const resolvedProjectId = allProjects.some(p => p.id === projectId) ? projectId : defaultProject.id;
-        const taskCode = row[2]?.trim() || null;
-        const title = row[3]?.trim();
-        const epic = row[4]?.trim() || null;
-        const feature = row[5]?.trim() || null;
-        const taskType = row[6]?.trim() || null;
-        let status = (row[7]?.trim() || "todo").toLowerCase();
-        let priority = (row[8]?.trim() || "medium").toLowerCase();
-        const assigneeEmail = row[9]?.trim()?.toLowerCase();
-        const dueDate = row[10]?.trim() || null;
-        const progress = parseInt(row[11]?.trim() || "0", 10) || 0;
-        const blocker = row[12]?.trim() || null;
-        const phase = row[13]?.trim() || null;
+      const id = row[0]?.trim();
+      const projectId = row[1]?.trim();
+      const resolvedProjectId = allProjects.some(p => p.id === projectId) ? projectId : defaultProject.id;
+      const taskCode = row[2]?.trim() || null;
+      const title = row[3]?.trim();
+      const epic = row[4]?.trim() || null;
+      const feature = row[5]?.trim() || null;
+      const taskType = row[6]?.trim() || null;
+      let status = (row[7]?.trim() || "todo").toLowerCase();
+      let priority = (row[8]?.trim() || "medium").toLowerCase();
+      const assigneeEmail = row[9]?.trim()?.toLowerCase();
+      const dueDate = row[10]?.trim() || null;
+      const progress = parseInt(row[11]?.trim() || "0", 10) || 0;
+      const blocker = row[12]?.trim() || null;
+      const phase = row[13]?.trim() || null;
 
-        if (!["todo", "in_progress", "review", "done"].includes(status)) {
-          status = "todo";
-        }
-        if (!["low", "medium", "high", "urgent"].includes(priority)) {
-          priority = "medium";
-        }
+      if (!["todo", "in_progress", "review", "done"].includes(status)) {
+        status = "todo";
+      }
+      if (!["low", "medium", "high", "urgent"].includes(priority)) {
+        priority = "medium";
+      }
 
-        if (!title) continue;
+      if (!title) continue;
 
-        const assigneeId = assigneeEmail ? (emailToUserIdMap[assigneeEmail] || null) : null;
+      const assigneeId = assigneeEmail ? (emailToUserIdMap[assigneeEmail] || null) : null;
 
-        if (id) {
-          const existing = await tx.select().from(tasks).where(eq(tasks.id, id));
-          if (existing.length > 0) {
-            const dbTask = existing[0];
-            
-            const statusOrder: Record<string, number> = { todo: 0, in_progress: 1, review: 2, done: 3 };
-            const dbStatusVal = statusOrder[dbTask.status || "todo"] ?? 0;
-            const sheetStatusVal = statusOrder[status] ?? 0;
+      const targetId = id || randomUUID();
+      const dbTask = id ? existingTasksMap.get(id) : null;
 
-            // Resolve status/progress conflict: DB takes precedence if it's further along (e.g. done vs todo)
-            const useDbStatus = dbStatusVal > sheetStatusVal;
-            const resolvedStatus = useDbStatus ? dbTask.status : status;
-            const resolvedProgress = useDbStatus ? dbTask.progress : progress;
+      if (dbTask) {
+        const statusOrder: Record<string, number> = { todo: 0, in_progress: 1, review: 2, done: 3 };
+        const dbStatusVal = statusOrder[dbTask.status || "todo"] ?? 0;
+        const sheetStatusVal = statusOrder[status] ?? 0;
 
-            const hasChanges =
-              dbTask.title !== title ||
-              dbTask.status !== resolvedStatus ||
-              dbTask.priority !== priority ||
-              dbTask.assigneeId !== assigneeId ||
-              dbTask.progress !== resolvedProgress ||
-              dbTask.blocker !== blocker ||
-              dbTask.phase !== phase ||
-              dbTask.epic !== epic ||
-              dbTask.feature !== feature ||
-              dbTask.taskCode !== taskCode ||
-              dbTask.dueDate !== dueDate ||
-              dbTask.projectId !== resolvedProjectId;
+        // Resolve status/progress conflict: DB takes precedence if it's further along (e.g. done vs todo)
+        const useDbStatus = dbStatusVal > sheetStatusVal;
+        const resolvedStatus = useDbStatus ? dbTask.status : status;
+        const resolvedProgress = useDbStatus ? dbTask.progress : progress;
 
-            if (hasChanges) {
-              await tx.update(tasks)
-                .set({
-                  projectId: resolvedProjectId,
-                  taskCode,
-                  title,
-                  epic,
-                  feature,
-                  taskType,
-                  status: resolvedStatus as any,
-                  priority: priority as any,
-                  assigneeId,
-                  dueDate,
-                  progress: resolvedProgress,
-                  blocker,
-                  phase,
-                  updatedAt: new Date().toISOString()
-                })
-                .where(eq(tasks.id, id));
-            }
-          } else {
-            const newTask: NewTask = {
-              id,
-              projectId: resolvedProjectId,
-              taskCode,
-              title,
-              epic,
-              feature,
-              taskType,
-              status: status as any,
-              priority: priority as any,
-              assigneeId,
-              dueDate,
-              progress,
-              blocker,
-              phase
-            };
-            await tx.insert(tasks).values(newTask);
-          }
-          processedTaskIds.add(id);
-        } else {
-          const newId = randomUUID();
-          const newTask: NewTask = {
-            id: newId,
+        const hasChanges =
+          dbTask.title !== title ||
+          dbTask.status !== resolvedStatus ||
+          dbTask.priority !== priority ||
+          dbTask.assigneeId !== assigneeId ||
+          dbTask.progress !== resolvedProgress ||
+          dbTask.blocker !== blocker ||
+          dbTask.phase !== phase ||
+          dbTask.epic !== epic ||
+          dbTask.feature !== feature ||
+          dbTask.taskCode !== taskCode ||
+          dbTask.dueDate !== dueDate ||
+          dbTask.projectId !== resolvedProjectId;
+
+        if (hasChanges) {
+          tasksToUpsert.push({
+            id: targetId,
             projectId: resolvedProjectId,
             taskCode,
             title,
             epic,
             feature,
             taskType,
-            status: status as any,
-            priority: priority as any,
+            status: resolvedStatus as "todo" | "in_progress" | "review" | "done",
+            priority: priority as "low" | "medium" | "high" | "urgent",
             assigneeId,
             dueDate,
-            progress,
+            progress: resolvedProgress,
             blocker,
-            phase
-          };
-          await tx.insert(tasks).values(newTask);
-          processedTaskIds.add(newId);
+            phase,
+            updatedAt: new Date().toISOString()
+          });
         }
+      } else {
+        tasksToUpsert.push({
+          id: targetId,
+          projectId: resolvedProjectId,
+          taskCode,
+          title,
+          epic,
+          feature,
+          taskType,
+          status: status as "todo" | "in_progress" | "review" | "done",
+          priority: priority as "low" | "medium" | "high" | "urgent",
+          assigneeId,
+          dueDate,
+          progress,
+          blocker,
+          phase
+        });
       }
-    });
+      processedTaskIds.add(targetId);
+    }
+
+    if (tasksToUpsert.length > 0) {
+      await db.transaction(async (tx) => {
+        await tx.insert(tasks)
+          .values(tasksToUpsert)
+          .onConflictDoUpdate({
+            target: tasks.id,
+            set: {
+              projectId: sql`excluded.project_id`,
+              taskCode: sql`excluded.task_code`,
+              title: sql`excluded.title`,
+              epic: sql`excluded.epic`,
+              feature: sql`excluded.feature`,
+              taskType: sql`excluded.task_type`,
+              status: sql`excluded.status`,
+              priority: sql`excluded.priority`,
+              assigneeId: sql`excluded.assignee_id`,
+              dueDate: sql`excluded.due_date`,
+              progress: sql`excluded.progress`,
+              blocker: sql`excluded.blocker`,
+              phase: sql`excluded.phase`,
+              updatedAt: sql`excluded.updated_at`
+            }
+          });
+      });
+    }
 
 
     // 4. Fetch latest tasks from DB
@@ -488,66 +494,74 @@ export async function syncGoogleSheets(options?: SyncOptions) {
     const tpRows = tpResponse.data.values || [];
     const tpDataRows = tpRows.slice(1);
 
-    await db.transaction(async (tx) => {
-      for (const row of tpDataRows) {
-        if (row.length === 0) continue;
+    // Fetch existing test plans from DB once before transaction to resolve N+1 queries
+    const existingDbTestPlans = await db.select().from(testPlans);
+    const existingPlansMap = new Map(existingDbTestPlans.map(p => [p.id, p]));
 
-        const id = row[0]?.trim();
-        const projectId = row[1]?.trim();
-        const resolvedProjectId = allProjects.some(p => p.id === projectId) ? projectId : defaultProject.id;
-        const name = row[2]?.trim();
-        const moduleName = row[3]?.trim();
-        let status = (row[4]?.trim() || "draft").toLowerCase();
+    const testPlansToUpsert: NewTestPlan[] = [];
 
-        if (!["draft", "active", "completed"].includes(status)) {
-          status = "draft";
-        }
+    // 10. Reconcile Test Plans from Sheet into DB
+    for (const row of tpDataRows) {
+      if (row.length === 0) continue;
 
-        if (!name || !moduleName) continue;
+      const id = row[0]?.trim();
+      const projectId = row[1]?.trim();
+      const resolvedProjectId = allProjects.some(p => p.id === projectId) ? projectId : defaultProject.id;
+      const name = row[2]?.trim();
+      const moduleName = row[3]?.trim();
+      let status = (row[4]?.trim() || "draft").toLowerCase();
 
-        if (id) {
-          const existing = await tx.select().from(testPlans).where(eq(testPlans.id, id));
-          if (existing.length > 0) {
-            const dbPlan = existing[0];
-            const hasChanges =
-              dbPlan.name !== name ||
-              dbPlan.module !== moduleName ||
-              dbPlan.status !== status ||
-              dbPlan.projectId !== resolvedProjectId;
+      if (!["draft", "active", "completed"].includes(status)) {
+        status = "draft";
+      }
 
-            if (hasChanges) {
-              await tx.update(testPlans)
-                .set({
-                  projectId: resolvedProjectId,
-                  name,
-                  module: moduleName as any,
-                  status: status as any,
-                })
-                .where(eq(testPlans.id, id));
-            }
-          } else {
-            const newPlan: NewTestPlan = {
-              id,
-              projectId: resolvedProjectId,
-              name,
-              module: moduleName as any,
-              status: status as any,
-            };
-            await tx.insert(testPlans).values(newPlan);
-          }
-        } else {
-          const newId = randomUUID();
-          const newPlan: NewTestPlan = {
-            id: newId,
+      if (!name || !moduleName) continue;
+
+      const targetId = id || randomUUID();
+      const dbPlan = id ? existingPlansMap.get(id) : null;
+
+      if (dbPlan) {
+        const hasChanges =
+          dbPlan.name !== name ||
+          dbPlan.module !== moduleName ||
+          dbPlan.status !== status ||
+          dbPlan.projectId !== resolvedProjectId;
+
+        if (hasChanges) {
+          testPlansToUpsert.push({
+            id: targetId,
             projectId: resolvedProjectId,
             name,
-            module: moduleName as any,
-            status: status as any,
-          };
-          await tx.insert(testPlans).values(newPlan);
+            module: moduleName as "Pemasok" | "Pelanggan" | "Barang" | "Katalog Lain" | "Pengaturan" | "Keuangan" | "Kinerja",
+            status: status as "draft" | "active" | "completed",
+          });
         }
+      } else {
+        testPlansToUpsert.push({
+          id: targetId,
+          projectId: resolvedProjectId,
+          name,
+          module: moduleName as "Pemasok" | "Pelanggan" | "Barang" | "Katalog Lain" | "Pengaturan" | "Keuangan" | "Kinerja",
+          status: status as "draft" | "active" | "completed",
+        });
       }
-    });
+    }
+
+    if (testPlansToUpsert.length > 0) {
+      await db.transaction(async (tx) => {
+        await tx.insert(testPlans)
+          .values(testPlansToUpsert)
+          .onConflictDoUpdate({
+            target: testPlans.id,
+            set: {
+              projectId: sql`excluded.project_id`,
+              name: sql`excluded.name`,
+              module: sql`excluded.module`,
+              status: sql`excluded.status`,
+            }
+          });
+      });
+    }
 
 
     // 11. Rewrite Test Plans sheet with latest DB state
@@ -625,119 +639,126 @@ export async function syncGoogleSheets(options?: SyncOptions) {
     const tcRows = tcResponse.data.values || [];
     const tcDataRows = tcRows.slice(1);
 
-    await db.transaction(async (tx) => {
-      for (const row of tcDataRows) {
-        if (row.length === 0) continue;
+    // Fetch existing test cases from DB once before transaction to resolve N+1 queries
+    const existingDbTestCases = await db.select().from(testCases);
+    const existingCasesMap = new Map(existingDbTestCases.map(c => [c.id, c]));
 
-        const id = row[0]?.trim();
-        const testPlanId = row[1]?.trim();
-        const caseNumber = row[2]?.trim();
-        const description = row[3]?.trim();
-        const steps = row[4]?.trim() || null;
-        const expectedResult = row[5]?.trim() || null;
-        const actualResult = row[6]?.trim() || null;
-        let status = (row[7]?.trim() || "pending").toLowerCase();
-        const notes = row[8]?.trim() || null;
-        const executedByEmail = row[9]?.trim()?.toLowerCase();
-        const executedAt = row[10]?.trim() || null;
-        const erpRole = row[11]?.trim() || null;
-        const testType = row[12]?.trim() || null;
+    const testCasesToUpsert: NewTestCase[] = [];
 
-        if (!["pending", "pass", "fail", "blocked"].includes(status)) {
-          status = "pending";
-        }
+    // 13. Reconcile Test Cases from Sheet into DB
+    for (const row of tcDataRows) {
+      if (row.length === 0) continue;
 
-        if (!caseNumber || !description || !testPlanId) continue;
+      const id = row[0]?.trim();
+      const testPlanId = row[1]?.trim();
+      const caseNumber = row[2]?.trim();
+      const description = row[3]?.trim();
+      const steps = row[4]?.trim() || null;
+      const expectedResult = row[5]?.trim() || null;
+      const actualResult = row[6]?.trim() || null;
+      let status = (row[7]?.trim() || "pending").toLowerCase();
+      const notes = row[8]?.trim() || null;
+      const executedByEmail = row[9]?.trim()?.toLowerCase();
+      const executedAt = row[10]?.trim() || null;
+      const erpRole = row[11]?.trim() || null;
+      const testType = row[12]?.trim() || null;
 
-        const executedById = executedByEmail ? (emailToUserIdMap[executedByEmail] || null) : null;
+      if (!["pending", "pass", "fail", "blocked"].includes(status)) {
+        status = "pending";
+      }
 
-        if (id) {
-          const existing = await tx.select().from(testCases).where(eq(testCases.id, id));
-          if (existing.length > 0) {
-            const dbCase = existing[0];
-            
-            const statusOrder: Record<string, number> = { pending: 0, fail: 1, blocked: 2, pass: 3 };
-            const dbStatusVal = statusOrder[dbCase.status || "pending"] ?? 0;
-            const sheetStatusVal = statusOrder[status] ?? 0;
+      if (!caseNumber || !description || !testPlanId) continue;
 
-            // Resolve status/results conflict: DB takes precedence if it's further along (e.g. pass vs fail)
-            const useDbStatus = dbStatusVal > sheetStatusVal;
-            const resolvedStatus = useDbStatus ? dbCase.status : status;
-            const resolvedActualResult = useDbStatus ? dbCase.actualResult : actualResult;
-            const resolvedNotes = useDbStatus ? dbCase.notes : notes;
-            const resolvedExecutedBy = useDbStatus ? dbCase.executedBy : executedById;
-            const resolvedExecutedAt = useDbStatus ? dbCase.executedAt : executedAt;
+      const executedById = executedByEmail ? (emailToUserIdMap[executedByEmail] || null) : null;
 
-            const hasChanges =
-              dbCase.caseNumber !== caseNumber ||
-              dbCase.description !== description ||
-              dbCase.steps !== steps ||
-              dbCase.expectedResult !== expectedResult ||
-              dbCase.actualResult !== resolvedActualResult ||
-              dbCase.status !== resolvedStatus ||
-              dbCase.notes !== resolvedNotes ||
-              dbCase.executedBy !== resolvedExecutedBy ||
-              dbCase.executedAt !== resolvedExecutedAt ||
-              dbCase.erpRole !== erpRole ||
-              dbCase.testType !== testType;
+      const targetId = id || randomUUID();
+      const dbCase = id ? existingCasesMap.get(id) : null;
 
-            if (hasChanges) {
-              await tx.update(testCases)
-                .set({
-                  testPlanId,
-                  caseNumber,
-                  description,
-                  steps,
-                  expectedResult,
-                  actualResult: resolvedActualResult,
-                  status: resolvedStatus as any,
-                  notes: resolvedNotes,
-                  executedBy: resolvedExecutedBy,
-                  executedAt: resolvedExecutedAt,
-                  erpRole: erpRole as any,
-                  testType: testType as any,
-                })
-                .where(eq(testCases.id, id));
-            }
-          } else {
-            const newCase: NewTestCase = {
-              id,
-              testPlanId,
-              caseNumber,
-              description,
-              steps,
-              expectedResult,
-              actualResult,
-              status: status as any,
-              notes,
-              executedBy: executedById,
-              executedAt,
-              erpRole: erpRole as any,
-              testType: testType as any,
-            };
-            await tx.insert(testCases).values(newCase);
-          }
-        } else {
-          const newId = randomUUID();
-          const newCase: NewTestCase = {
-            id: newId,
+      if (dbCase) {
+        const statusOrder: Record<string, number> = { pending: 0, fail: 1, blocked: 2, pass: 3 };
+        const dbStatusVal = statusOrder[dbCase.status || "pending"] ?? 0;
+        const sheetStatusVal = statusOrder[status] ?? 0;
+
+        // Resolve status/results conflict: DB takes precedence if it's further along (e.g. pass vs fail)
+        const useDbStatus = dbStatusVal > sheetStatusVal;
+        const resolvedStatus = useDbStatus ? dbCase.status : status;
+        const resolvedActualResult = useDbStatus ? dbCase.actualResult : actualResult;
+        const resolvedNotes = useDbStatus ? dbCase.notes : notes;
+        const resolvedExecutedBy = useDbStatus ? dbCase.executedBy : executedById;
+        const resolvedExecutedAt = useDbStatus ? dbCase.executedAt : executedAt;
+
+        const hasChanges =
+          dbCase.caseNumber !== caseNumber ||
+          dbCase.description !== description ||
+          dbCase.steps !== steps ||
+          dbCase.expectedResult !== expectedResult ||
+          dbCase.actualResult !== resolvedActualResult ||
+          dbCase.status !== resolvedStatus ||
+          dbCase.notes !== resolvedNotes ||
+          dbCase.executedBy !== resolvedExecutedBy ||
+          dbCase.executedAt !== resolvedExecutedAt ||
+          dbCase.erpRole !== erpRole ||
+          dbCase.testType !== testType;
+
+        if (hasChanges) {
+          testCasesToUpsert.push({
+            id: targetId,
             testPlanId,
             caseNumber,
             description,
             steps,
             expectedResult,
-            actualResult,
-            status: status as any,
-            notes,
-            executedBy: executedById,
-            executedAt,
-            erpRole: erpRole as any,
-            testType: testType as any,
-          };
-          await tx.insert(testCases).values(newCase);
+            actualResult: resolvedActualResult,
+            status: resolvedStatus as "pending" | "pass" | "fail" | "blocked",
+            notes: resolvedNotes,
+            executedBy: resolvedExecutedBy,
+            executedAt: resolvedExecutedAt,
+            erpRole: erpRole as "administrator" | "top_user" | "user" | "matrix" | null,
+            testType: testType as "functional" | "permission" | "workflow" | "matrix" | null,
+          });
         }
+      } else {
+        testCasesToUpsert.push({
+          id: targetId,
+          testPlanId,
+          caseNumber,
+          description,
+          steps,
+          expectedResult,
+          actualResult,
+          status: status as "pending" | "pass" | "fail" | "blocked",
+          notes,
+          executedBy: executedById,
+          executedAt,
+          erpRole: erpRole as "administrator" | "top_user" | "user" | "matrix" | null,
+          testType: testType as "functional" | "permission" | "workflow" | "matrix" | null,
+        });
       }
-    });
+    }
+
+    if (testCasesToUpsert.length > 0) {
+      await db.transaction(async (tx) => {
+        await tx.insert(testCases)
+          .values(testCasesToUpsert)
+          .onConflictDoUpdate({
+            target: testCases.id,
+            set: {
+              testPlanId: sql`excluded.test_plan_id`,
+              caseNumber: sql`excluded.case_number`,
+              description: sql`excluded.description`,
+              steps: sql`excluded.steps`,
+              expectedResult: sql`excluded.expected_result`,
+              actualResult: sql`excluded.actual_result`,
+              status: sql`excluded.status`,
+              notes: sql`excluded.notes`,
+              executedBy: sql`excluded.executed_by`,
+              executedAt: sql`excluded.executed_at`,
+              erpRole: sql`excluded.erp_role`,
+              testType: sql`excluded.test_type`,
+            }
+          });
+      });
+    }
 
 
     // 14. Rewrite Test Cases sheet with latest DB state

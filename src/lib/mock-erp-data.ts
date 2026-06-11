@@ -1,5 +1,5 @@
 // Mock data for the 13 Staging ERP Master Tables and Product Catalog
-export const mockErpData: Record<string, any[]> = {
+export const mockErpData: Record<string, Array<Record<string, string | number | boolean | null | undefined>>> = {
   MasClient: [
     { id: 1, clientCode: "CL-ASTR-01", name: "PT. Astra International Tbk", type: "Corporate", status: "Active" },
     { id: 2, clientCode: "CL-INDF-02", name: "PT. Indofood Sukses Makmur Tbk", type: "Corporate", status: "Active" },

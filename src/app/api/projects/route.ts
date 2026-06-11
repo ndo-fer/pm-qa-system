@@ -3,7 +3,6 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/auth";
 import { db } from "@/db";
 import { projects, NewProject, projectMembers, users } from "@/db/schema";
-import { eq } from "drizzle-orm";
 import { randomUUID } from "crypto";
 
 export async function GET() {
@@ -36,13 +35,15 @@ export async function POST(request: Request) {
   await db.transaction(async (tx) => {
     await tx.insert(projects).values(newProject);
     const allUsers = await tx.select().from(users);
-    for (const u of allUsers) {
-      await tx.insert(projectMembers).values({
-        id: randomUUID(),
-        projectId: newProject.id,
-        userId: u.id,
-        role: u.role,
-      });
+    if (allUsers.length > 0) {
+      await tx.insert(projectMembers).values(
+        allUsers.map((u) => ({
+          id: randomUUID(),
+          projectId: newProject.id,
+          userId: u.id,
+          role: u.role,
+        }))
+      );
     }
   });
 

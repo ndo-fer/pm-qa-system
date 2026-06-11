@@ -1,3 +1,4 @@
+/* eslint-disable react-hooks/set-state-in-effect */
 "use client";
 
 import { useState, useEffect } from "react";
@@ -40,6 +41,23 @@ const roleLabels: Record<string, string> = {
   qa: "QA Tester",
 };
 
+function formatDisplayDate(dateStr?: string | null): string {
+  if (!dateStr) return "-";
+  let normalized = dateStr.includes(" ") ? dateStr.replace(" ", "T") : dateStr;
+  if (!normalized.endsWith("Z") && !normalized.includes("+") && !/-\d{2}:\d{2}$/.test(normalized)) {
+    normalized += "Z";
+  }
+  const date = new Date(normalized);
+  if (isNaN(date.getTime())) {
+    return dateStr.split("T")[0].split(" ")[0];
+  }
+  return date.toLocaleDateString("id-ID", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+  });
+}
+
 export default function UsersPage() {
   const { data: session, status } = useSession();
   const router = useRouter();
@@ -74,7 +92,7 @@ export default function UsersPage() {
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     const method = editingUser ? "PUT" : "POST";
-    const body: any = { name, email, role };
+    const body: { name: string; email: string; role: string; password?: string; id?: string } = { name, email, role };
     if (password) body.password = password;
     if (editingUser) body.id = editingUser.id;
 
@@ -155,9 +173,9 @@ export default function UsersPage() {
           <form onSubmit={handleSubmit} className="border rounded-lg p-4 bg-white space-y-4">
             <h3 className="font-medium">{editingUser ? "Edit User" : "New User"}</h3>
             <div className="grid grid-cols-4 gap-4">
-              <Input placeholder="Name" value={name} onChange={(e) => setName(e.target.value)} required />
-              <Input placeholder="Email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} required />
-              <Input placeholder={editingUser ? "New password (optional)" : "Password"} type="password" value={password} onChange={(e) => setPassword(e.target.value)} required={!editingUser} />
+              <Input placeholder="Name" value={name} onChange={(e) => setName(e.target.value)} required autoComplete="new-user-name" />
+              <Input placeholder="Email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} required autoComplete="new-user-email" />
+              <Input placeholder={editingUser ? "New password (optional)" : "Password"} type="password" value={password} onChange={(e) => setPassword(e.target.value)} required={!editingUser} autoComplete="new-password" />
               <Select value={role} onValueChange={(v) => v && setRole(v)}>
                 <SelectTrigger><SelectValue placeholder="Role" /></SelectTrigger>
                 <SelectContent>
@@ -197,7 +215,7 @@ export default function UsersPage() {
                     <TableCell className="font-medium">{user.name}</TableCell>
                     <TableCell>{user.email}</TableCell>
                     <TableCell><Badge variant="secondary">{roleLabels[user.role]}</Badge></TableCell>
-                    <TableCell>{user.createdAt?.split("T")[0] || "-"}</TableCell>
+                    <TableCell>{formatDisplayDate(user.createdAt)}</TableCell>
                     <TableCell>
                       <div className="flex gap-1">
                         <Button variant="ghost" size="icon" onClick={() => startEdit(user)}>

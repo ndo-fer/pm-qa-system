@@ -58,10 +58,10 @@ interface Task {
 interface TaskPreviewModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  task: any;
+  task: Task | null;
   projects: Project[];
   users: UserType[];
-  onEdit: (task: any) => void;
+  onEdit: (task: Task) => void;
 }
 
 const statusLabels: Record<string, string> = {

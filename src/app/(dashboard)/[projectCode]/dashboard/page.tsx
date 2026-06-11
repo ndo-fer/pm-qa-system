@@ -23,6 +23,7 @@ async function getStats(activeProjectId: string, userId: string) {
     qaCountResult,
     passedQAResult,
     failedQAResult,
+    blockedQAResult,
     planCountResult,
     milestoneCountResult,
     overdueTasksResult,
@@ -35,6 +36,7 @@ async function getStats(activeProjectId: string, userId: string) {
     db.select({ count: count() }).from(testCases).innerJoin(testPlans, eq(testCases.testPlanId, testPlans.id)).where(eq(testPlans.projectId, activeProjectId)),
     db.select({ count: count() }).from(testCases).innerJoin(testPlans, eq(testCases.testPlanId, testPlans.id)).where(and(eq(testPlans.projectId, activeProjectId), eq(testCases.status, "pass"))),
     db.select({ count: count() }).from(testCases).innerJoin(testPlans, eq(testCases.testPlanId, testPlans.id)).where(and(eq(testPlans.projectId, activeProjectId), eq(testCases.status, "fail"))),
+    db.select({ count: count() }).from(testCases).innerJoin(testPlans, eq(testCases.testPlanId, testPlans.id)).where(and(eq(testPlans.projectId, activeProjectId), eq(testCases.status, "blocked"))),
     db.select({ count: count() }).from(testPlans).where(eq(testPlans.projectId, activeProjectId)),
     db.select({ count: count() }).from(milestones).where(eq(milestones.projectId, activeProjectId)),
     db.select({ count: count() }).from(tasks).where(and(eq(tasks.projectId, activeProjectId), eq(tasks.status, "todo"), lt(tasks.dueDate, today))),
@@ -50,6 +52,7 @@ async function getStats(activeProjectId: string, userId: string) {
     totalQA: qaCountResult[0].count,
     passedQA: passedQAResult[0].count,
     failedQA: failedQAResult[0].count,
+    blockedQA: blockedQAResult[0].count,
     testPlans: planCountResult[0].count,
     milestones: milestoneCountResult[0].count,
     sCurveGroup,
@@ -123,10 +126,13 @@ export default async function DashboardPage({ params }: { params: Promise<{ proj
   // Current week from S-Curve — use string comparison to avoid UTC timezone mismatch
   const now = new Date();
   const todayStr = now.toISOString().slice(0, 10); // "YYYY-MM-DD" in UTC, which matches stored dates
-  const currentWeek = stats.sCurveGroup.overall.find((w: any) =>
+  const currentWeek = stats.sCurveGroup.overall.find((w: { weekStart: string; weekEnd: string; plannedCumulative: number; actualCumulative?: number | null }) =>
     w.weekStart <= todayStr && todayStr <= w.weekEnd
   );
   const plannedProgress = currentWeek ? (currentWeek.plannedCumulative * 100).toFixed(1) : "0";
+
+  const totalExecutedQA = stats.passedQA + stats.failedQA + stats.blockedQA;
+  const qaPassRate = totalExecutedQA > 0 ? Math.round((stats.passedQA / totalExecutedQA) * 100) : 0;
 
   return (
     <AppLayout>
@@ -178,10 +184,10 @@ export default async function DashboardPage({ params }: { params: Promise<{ proj
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold">
-                {stats.totalQA > 0 ? Math.round((stats.passedQA / stats.totalQA) * 100) : 0}%
+                {qaPassRate}%
               </div>
               <p className="text-xs text-gray-500">
-                {stats.passedQA} pass, {stats.failedQA} fail ({stats.totalQA} total)
+                {stats.passedQA} pass, {stats.failedQA} fail, {stats.blockedQA} blocked ({stats.totalQA} total)
               </p>
             </CardContent>
           </Card>

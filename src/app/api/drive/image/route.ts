@@ -57,7 +57,7 @@ export async function GET(req: NextRequest) {
     );
 
     const nodeStream = response.data as Readable;
-    const webStream = Readable.toWeb(nodeStream) as any;
+    const webStream = Readable.toWeb(nodeStream) as ReadableStream;
 
     return new NextResponse(webStream, {
       headers: {
@@ -65,8 +65,8 @@ export async function GET(req: NextRequest) {
         "Cache-Control": "public, max-age=3600, stale-while-revalidate=86400",
       },
     });
-  } catch (err: any) {
-    console.error("[Drive Image Proxy Error]:", err?.message || err);
-    return NextResponse.json({ error: err?.message || String(err) }, { status: 500 });
+  } catch (err) {
+    console.error("[Drive Image Proxy Error]:", (err as Error).message || err);
+    return NextResponse.json({ error: (err as Error).message || String(err) }, { status: 500 });
   }
 }

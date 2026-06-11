@@ -6,7 +6,7 @@ import { projects, tasks, testPlans, testCases, milestones, projectMembers, user
 import { randomUUID } from "crypto";
 import * as XLSX from "xlsx";
 
-function excelDateToDate(serial: any): Date {
+function excelDateToDate(serial: unknown): Date {
   if (serial instanceof Date) return serial;
   if (typeof serial === "string") {
     if (/^\d{4}-\d{2}-\d{2}/.test(serial)) {
@@ -27,7 +27,7 @@ function excelDateToDate(serial: any): Date {
   return new Date();
 }
 
-function excelDateToString(serial: any): string {
+function excelDateToString(serial: unknown): string {
   if (!serial) return "";
   try {
     const d = excelDateToDate(serial);
@@ -35,7 +35,7 @@ function excelDateToString(serial: any): string {
     const month = String(d.getMonth() + 1).padStart(2, "0");
     const day = String(d.getDate()).padStart(2, "0");
     return `${year}-${month}-${day}`;
-  } catch (e) {
+  } catch {
     return String(serial);
   }
 }
@@ -110,16 +110,22 @@ export async function POST(request: Request) {
     await db.transaction(async (tx) => {
       // 1. Insert Project details
       // Prepare S-Curve from S-Curve Data sheet if available
-      let sCurvePlanned: any[] = [];
+      let sCurvePlanned: {
+        week: number;
+        weekStart: string;
+        weekEnd: string;
+        plannedCumulative: number;
+        targetMilestone: string;
+      }[] = [];
       const sCurveSheet = workbook.SheetNames.find(n => n === "S-Curve Data");
       if (sCurveSheet) {
-        const sCurveRows = XLSX.utils.sheet_to_json(workbook.Sheets[sCurveSheet], { defval: "" }) as Record<string, any>[];
+        const sCurveRows = XLSX.utils.sheet_to_json(workbook.Sheets[sCurveSheet], { defval: "" }) as Record<string, unknown>[];
         sCurvePlanned = sCurveRows.map((r) => ({
-          week: r["Week"],
+          week: Number(r["Week"] || 0),
           weekStart: r["Week Start"] ? excelDateToString(r["Week Start"]) : "",
           weekEnd: r["Week End"] ? excelDateToString(r["Week End"]) : "",
-          plannedCumulative: r["Planned Cumulative %"],
-          targetMilestone: r["Target Milestone"],
+          plannedCumulative: Number(r["Planned Cumulative %"] || 0),
+          targetMilestone: String(r["Target Milestone"] || ""),
         }));
       }
 
@@ -131,7 +137,7 @@ export async function POST(request: Request) {
         startDate: startDate,
         endDate: endDate || null,
         status: "active",
-        sCurveTarget: sCurvePlanned as any,
+        sCurveTarget: sCurvePlanned,
       });
 
       // Add all system users to this new project so that they can view/test it
@@ -148,10 +154,10 @@ export async function POST(request: Request) {
       // 2. Parse Milestones from Milestone Plan sheet
       const milestoneSheet = workbook.SheetNames.find(n => n === "Milestone Plan");
       if (milestoneSheet) {
-        const milestoneRows = XLSX.utils.sheet_to_json(workbook.Sheets[milestoneSheet], { defval: "" }) as Record<string, any>[];
+        const milestoneRows = XLSX.utils.sheet_to_json(workbook.Sheets[milestoneSheet], { defval: "" }) as Record<string, unknown>[];
         for (const row of milestoneRows) {
           const phase = String(row["Phase"] || "").trim();
-          const module = String(row["Modul"] || "").trim();
+          const milestoneModule = String(row["Modul"] || "").trim();
           const milestoneName = String(row["Milestone"] || "").trim();
           if (!phase || !milestoneName || milestoneName === "NaN") continue;
 
@@ -159,7 +165,7 @@ export async function POST(request: Request) {
             id: randomUUID(),
             projectId: newProjectId,
             phase,
-            module,
+            module: milestoneModule,
             name: milestoneName,
             startDate: row["Start Date"] ? excelDateToString(row["Start Date"]) : null,
             endDate: row["End Date"] ? excelDateToString(row["End Date"]) : null,
@@ -175,7 +181,7 @@ export async function POST(request: Request) {
       const taskSheet = workbook.SheetNames.find(n => n === "Developer Task Board");
       const detectedEpics = new Set<string>();
       if (taskSheet) {
-        const taskRows = XLSX.utils.sheet_to_json(workbook.Sheets[taskSheet], { defval: "" }) as Record<string, any>[];
+        const taskRows = XLSX.utils.sheet_to_json(workbook.Sheets[taskSheet], { defval: "" }) as Record<string, unknown>[];
         for (const row of taskRows) {
           const taskCode = String(row["Task ID"] || "").trim();
           const epic = String(row["Epic / Modul"] || "").trim();
@@ -197,7 +203,7 @@ export async function POST(request: Request) {
             title: taskName,
             description: descriptionStr + (notes ? "\n\nNotes: " + notes : ""),
             status: "todo",
-            priority: priority as any,
+            priority: priority as "low" | "medium" | "high" | "urgent",
             taskCode,
             epic,
             feature,
@@ -215,9 +221,9 @@ export async function POST(request: Request) {
 
       // 4. Parse or auto-generate QA Test Cases
       const qaSheetName = workbook.SheetNames.find(n => n === "QA Test Cases" || n === "Test Cases");
-      let qaRows: Record<string, any>[] = [];
+      let qaRows: Record<string, unknown>[] = [];
       if (qaSheetName) {
-        qaRows = XLSX.utils.sheet_to_json(workbook.Sheets[qaSheetName], { defval: "" }) as Record<string, any>[];
+        qaRows = XLSX.utils.sheet_to_json(workbook.Sheets[qaSheetName], { defval: "" }) as Record<string, unknown>[];
       }
 
       if (qaRows.length > 0) {
@@ -257,7 +263,7 @@ export async function POST(request: Request) {
             description: String(row["Scenario"] || row["Description"] || "Kasus Uji"),
             steps,
             expectedResult: expected,
-            status: status as any,
+            status: status as "pending" | "pass" | "fail" | "blocked",
             erpRole: erpRole || null,
           });
         }
@@ -300,8 +306,8 @@ export async function POST(request: Request) {
     });
 
     return NextResponse.json({ success: true, projectId: newProjectId }, { status: 201 });
-  } catch (error: any) {
+  } catch (error) {
     console.error("Error importing project:", error);
-    return NextResponse.json({ error: error.message || "Failed to import project" }, { status: 500 });
+    return NextResponse.json({ error: (error as Error).message || "Failed to import project" }, { status: 500 });
   }
 }

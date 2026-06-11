@@ -2,9 +2,10 @@ import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/auth";
 import { db } from "@/db";
-import { testPlans, NewTestPlan, projectMembers, projects } from "@/db/schema";
-import { eq, desc, and } from "drizzle-orm";
+import { testPlans, NewTestPlan, projects } from "@/db/schema";
+import { eq, desc } from "drizzle-orm";
 import { randomUUID } from "crypto";
+import { authorizeProjectRole } from "@/lib/auth-helpers";
 
 export async function GET(request: Request) {
   const session = await getServerSession(authOptions);
@@ -24,13 +25,9 @@ export async function GET(request: Request) {
     }
   }
 
-  // Verify membership
-  const member = await db
-    .select()
-    .from(projectMembers)
-    .where(and(eq(projectMembers.projectId, targetProjectId), eq(projectMembers.userId, session.user.id)))
-    .limit(1);
-  if (member.length === 0) return NextResponse.json({ error: "Access denied" }, { status: 403 });
+  // Verify project membership and role (Only admin, pm, and qa can access test plans)
+  const auth = await authorizeProjectRole(targetProjectId, session.user.id, ["admin", "pm", "qa"]);
+  if (!auth.authorized) return auth.errorResponse!;
 
   const allPlans = await db
     .select()
@@ -53,6 +50,10 @@ export async function POST(request: Request) {
       targetProjectId = project[0].id;
     }
   }
+
+  // Verify project membership and role (Only admin, pm, and qa can create test plans)
+  const auth = await authorizeProjectRole(targetProjectId, session.user.id, ["admin", "pm", "qa"]);
+  if (!auth.authorized) return auth.errorResponse!;
 
   const newPlan: NewTestPlan = {
     id: randomUUID(),

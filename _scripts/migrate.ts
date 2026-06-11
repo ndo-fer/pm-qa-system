@@ -280,6 +280,9 @@ async function migrate() {
   const execWb = XLSX.readFile(path.join(ERP_BASE, "QA/00_Rencana_Pelacak/02_Pelacak_Testing.xlsx"));
   const execRows = XLSX.utils.sheet_to_json(execWb.Sheets["Execution Log"], { defval: "" }) as Record<string, any>[];
 
+  const allCases = await db.select().from(testCases);
+  const casesMap = new Map(allCases.map((tc) => [tc.caseNumber, tc]));
+
   let execCount = 0;
   for (const row of execRows) {
     const tcId = String(row["Test Case ID"] || "").trim();
@@ -290,8 +293,7 @@ async function migrate() {
     const newStatus = STATUS_MAP[result];
     if (!newStatus || newStatus === "pending") continue;
 
-    const allCases = await db.select().from(testCases);
-    const match = allCases.find((tc) => tc.caseNumber === tcId);
+    const match = casesMap.get(tcId);
     if (match) {
       await db
         .update(testCases)

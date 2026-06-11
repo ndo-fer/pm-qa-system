@@ -42,7 +42,7 @@ export async function GET(
     }
 
     const filtered = data.filter(
-      (item) => item.jenisBaku.toUpperCase() === uppercaseJenis
+      (item) => String(item.jenisBaku || "").toUpperCase() === uppercaseJenis
     );
     return NextResponse.json(filtered);
   }

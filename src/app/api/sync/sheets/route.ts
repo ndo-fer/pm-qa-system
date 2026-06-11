@@ -14,10 +14,10 @@ export async function POST(request: Request) {
     const scope: SyncScope = body.scope || "all";
     const result = await syncGoogleSheets({ scope });
     return NextResponse.json(result);
-  } catch (err: any) {
+  } catch (err) {
     console.error("Google Sheets Sync Error:", err);
     return NextResponse.json(
-      { error: err.message || "Failed to synchronize with Google Sheets" },
+      { error: (err as Error).message || "Failed to synchronize with Google Sheets" },
       { status: 500 }
     );
   }

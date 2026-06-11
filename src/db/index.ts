@@ -7,7 +7,21 @@ import * as schema from "./schema";
 loadEnvConfig(process.cwd());
 
 const connectionString = process.env.DATABASE_URL!;
-const client = postgres(connectionString, { prepare: false });
+
+let client: postgres.Sql;
+
+if (process.env.NODE_ENV === "production") {
+  client = postgres(connectionString, { prepare: false });
+} else {
+  const globalWithPostgres = global as typeof globalThis & {
+    postgresClient?: postgres.Sql;
+  };
+  if (!globalWithPostgres.postgresClient) {
+    globalWithPostgres.postgresClient = postgres(connectionString, { prepare: false });
+  }
+  client = globalWithPostgres.postgresClient;
+}
+
 export const db = drizzle(client, { schema });
 
 export const runtime = "nodejs";

@@ -1,6 +1,7 @@
+/* eslint-disable react-hooks/set-state-in-effect */
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useSession } from "next-auth/react";
 import { useParams } from "next/navigation";
 import { AppLayout } from "@/components/layout/app-layout";
@@ -19,7 +20,6 @@ import {
   SelectContent,
   SelectItem,
   SelectTrigger,
-  SelectValue,
 } from "@/components/ui/select";
 import { TaskForm } from "@/components/tasks/task-form";
 import {
@@ -45,12 +45,12 @@ interface Task {
   status: string;
   priority: string;
   dueDate: string | null;
-  taskCode: string | null;
-  epic: string | null;
-  feature: string | null;
-  phase: string | null;
-  progress: number;
-  blocker: string | null;
+  taskCode?: string | null;
+  epic?: string | null;
+  feature?: string | null;
+  phase?: string | null;
+  progress?: number;
+  blocker?: string | null;
   taskType?: string | null;
   srdRef?: string | null;
   frCode?: string | null;
@@ -148,8 +148,8 @@ export default function TasksPage() {
   // Set default filter to current logged-in developer
   useEffect(() => {
     if (session?.user) {
-      const userRole = (session.user as any).role;
-      const userId = (session.user as any).id;
+      const userRole = (session.user as { role?: string }).role;
+      const userId = (session.user as { id?: string }).id;
       if (userRole === "developer" && userId) {
         setFilterAssignee(userId);
       }
@@ -203,7 +203,8 @@ export default function TasksPage() {
     }
   }
 
-  async function fetchData() {
+  // eslint-disable-next-line react-hooks/preserve-manual-memoization
+  const fetchData = useCallback(async () => {
     setLoading(true);
     const queryParams = new URLSearchParams();
     if (filterErpRole) queryParams.set("erpRole", filterErpRole);
@@ -220,7 +221,7 @@ export default function TasksPage() {
     if (usersRes.ok) setUsers(await usersRes.json());
     if (milestonesRes.ok) setMilestoneList(await milestonesRes.json());
     setLoading(false);
-  }
+  }, [filterErpRole, projectCode]);
 
   useEffect(() => {
     fetchData();
@@ -259,11 +260,11 @@ export default function TasksPage() {
         }
       }
     }
-  }, []);
+  }, [fetchData, projectCode]);
 
   useEffect(() => {
     fetchData();
-  }, [filterErpRole]);
+  }, [fetchData]);
 
   // Database data is fetched scoping to the selected project
   async function handleDelete(id: string) {
@@ -273,7 +274,7 @@ export default function TasksPage() {
   }
 
   async function handleToggleArchive(task: Task) {
-    const isTaskArchived = (task as any).isArchived === 1 || (task as any).isArchived === true;
+    const isTaskArchived = task.isArchived === 1 || task.isArchived === true;
     try {
       const res = await fetch(`/api/tasks/${task.id}`, {
         method: "PUT",
@@ -289,7 +290,7 @@ export default function TasksPage() {
   }
 
   const filteredTasks = tasks.filter((t) => {
-    const isTaskArchived = (t as any).isArchived === 1 || (t as any).isArchived === true;
+    const isTaskArchived = t.isArchived === 1 || t.isArchived === true;
     if (!showArchived && isTaskArchived) return false;
 
     if (filterStatus && t.status !== filterStatus) return false;
@@ -319,7 +320,6 @@ export default function TasksPage() {
     ? milestoneList.map((m) => m.phase).filter(Boolean)
     : Array.from(new Set(tasks.map((t) => t.phase).filter(Boolean))) as string[];
 
-  const getUserName = (userId: string | null) => users.find((u) => u.id === userId)?.name || "Unassigned";
 
   // Drag and Drop handlers
   const handleDragStart = (e: React.DragEvent, index: number) => {
@@ -358,7 +358,7 @@ export default function TasksPage() {
   // Summary by module — only count non-archived tasks so chip numbers match the board
   const moduleSummary = modules.map((mod) => {
     const moduleTasks = tasks.filter((t) => {
-      const archived = (t as any).isArchived === 1 || (t as any).isArchived === true;
+      const archived = t.isArchived === 1 || t.isArchived === true;
       return t.epic === mod && !archived;
     });
     const done = moduleTasks.filter((t) => t.status === "done").length;
@@ -438,7 +438,7 @@ export default function TasksPage() {
 
         {/* Module Summary */}
         <div className="flex flex-row gap-2 overflow-x-auto pb-2 flex-nowrap flex-shrink-0 scrollbar-thin select-none">
-          {moduleSummary.map((s: any, index: number) => (
+          {moduleSummary.map((s, index) => (
             <button
               key={s.name}
               draggable

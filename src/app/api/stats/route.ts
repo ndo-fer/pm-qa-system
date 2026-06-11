@@ -58,14 +58,14 @@ export async function GET() {
 
   // Get S-Curve data from active project
   const project = await db.select().from(projects).where(eq(projects.id, activeProjectId)).limit(1);
-  let sCurve = [];
+  let sCurve: unknown[] = [];
   if (project[0]?.sCurveTarget) {
     try {
       sCurve = typeof project[0].sCurveTarget === "string" 
         ? JSON.parse(project[0].sCurveTarget) 
-        : project[0].sCurveTarget;
-    } catch (e) {
-      sCurve = project[0].sCurveTarget as any;
+        : project[0].sCurveTarget as unknown[];
+    } catch {
+      sCurve = project[0].sCurveTarget as unknown[];
     }
   }
 

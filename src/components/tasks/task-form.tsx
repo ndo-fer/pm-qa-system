@@ -1,3 +1,4 @@
+/* eslint-disable react-hooks/set-state-in-effect */
 "use client";
 
 import { useState, useEffect } from "react";
@@ -54,7 +55,7 @@ interface Task {
   phase?: string | null;
   screenshotUrl?: string | null;
   erpRole?: string | null;
-  roleSpecificFeatures?: any;
+  roleSpecificFeatures?: unknown;
 }
 
 interface TaskFormProps {

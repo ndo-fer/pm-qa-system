@@ -15,12 +15,12 @@ interface Task {
   status: string;
   priority: string;
   dueDate: string | null;
-  taskCode: string | null;
-  epic: string | null;
-  feature: string | null;
-  phase: string | null;
-  progress: number;
-  blocker: string | null;
+  taskCode?: string | null;
+  epic?: string | null;
+  feature?: string | null;
+  phase?: string | null;
+  progress?: number;
+  blocker?: string | null;
   isArchived?: number | boolean | null;
 }
 
@@ -85,7 +85,7 @@ export function KanbanBoard({ tasks, onEdit, onPreview, onRefresh }: KanbanBoard
   });
 
   async function handleToggleArchive(task: Task) {
-    const isTaskArchived = (task as any).isArchived === 1 || (task as any).isArchived === true;
+    const isTaskArchived = task.isArchived === 1 || task.isArchived === true;
     setUpdatingId(task.id);
     try {
       const res = await fetch(`/api/tasks/${task.id}`, {
@@ -333,9 +333,9 @@ export function KanbanBoard({ tasks, onEdit, onPreview, onRefresh }: KanbanBoard
                               size="icon" 
                               className="w-5 h-5 rounded hover:bg-slate-100"
                               onClick={(e) => { e.stopPropagation(); handleToggleArchive(task); }}
-                              title={(task as any).isArchived === 1 || (task as any).isArchived === true ? "Restore Task" : "Archive Task"}
+                              title={task.isArchived === 1 || task.isArchived === true ? "Restore Task" : "Archive Task"}
                             >
-                              {((task as any).isArchived === 1 || (task as any).isArchived === true) ? (
+                              {(task.isArchived === 1 || task.isArchived === true) ? (
                                 <ArchiveRestore className="w-3 h-3 text-amber-600 hover:text-amber-800" />
                               ) : (
                                 <Archive className="w-3 h-3 text-slate-500 hover:text-slate-800" />

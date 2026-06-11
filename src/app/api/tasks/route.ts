@@ -29,7 +29,7 @@ const taskCreateSchema = z.object({
   phase: z.string().nullable().optional(),
   erpRole: z.enum(["administrator", "top_user", "user", "all_roles"]).default("all_roles"),
   screenshotUrl: z.string().nullable().optional(),
-  roleSpecificFeatures: z.any().nullable().optional(),
+  roleSpecificFeatures: z.unknown().nullable().optional(),
 });
 
 export async function GET(request: Request) {
@@ -80,10 +80,10 @@ export async function POST(request: Request) {
   const session = await getServerSession(authOptions);
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-  let body: any;
+  let body: unknown;
   try {
     body = await request.json();
-  } catch (e) {
+  } catch {
     return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
   }
 

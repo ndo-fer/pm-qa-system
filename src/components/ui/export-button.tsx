@@ -11,8 +11,8 @@ import { cn } from "@/lib/utils";
 import { Download, FileJson, FileSpreadsheet, FileText } from "lucide-react";
 import { exportToCSV, exportToJSON, exportToPDF } from "@/lib/export-utils";
 
-interface ExportButtonProps {
-  data: any[] | (() => any[]);
+interface ExportButtonProps<T> {
+  data: T[] | (() => T[]);
   filename: string;
   className?: string;
   variant?: "default" | "outline" | "secondary" | "ghost" | "destructive" | "link";
@@ -20,23 +20,23 @@ interface ExportButtonProps {
   label?: string;
 }
 
-export function ExportButton({
+export function ExportButton<T>({
   data,
   filename,
   className,
   variant = "outline",
   size = "sm",
   label = "Export As...",
-}: ExportButtonProps) {
+}: ExportButtonProps<T>) {
   const handleExport = (type: "csv" | "json" | "pdf") => {
     const exportData = typeof data === "function" ? data() : data;
     const dateStr = new Date().toISOString().split("T")[0];
     const formattedFilename = `${filename}_${dateStr}`;
 
     if (type === "csv") {
-      exportToCSV(exportData, formattedFilename);
+      exportToCSV(exportData as unknown as Record<string, unknown>[], formattedFilename);
     } else if (type === "pdf") {
-      exportToPDF(exportData, formattedFilename);
+      exportToPDF(exportData as unknown as Record<string, unknown>[], formattedFilename);
     } else {
       exportToJSON(exportData, formattedFilename);
     }

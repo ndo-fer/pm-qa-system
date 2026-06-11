@@ -114,10 +114,10 @@ export function Sidebar() {
             "flex items-center rounded-md text-sm transition-colors text-gray-400 hover:bg-gray-850 hover:text-red-400 w-full cursor-pointer",
             collapsed ? "justify-center p-2" : "gap-3 px-3 py-2"
           )}
-          title="Switch Project"
+          title="Sign Out"
         >
           <LogOut className="w-5 h-5 shrink-0 text-red-500" />
-          {!collapsed && <span>Switch Project</span>}
+          {!collapsed && <span>Sign Out</span>}
         </button>
       </div>
     </aside>

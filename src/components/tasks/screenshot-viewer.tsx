@@ -1,6 +1,7 @@
+/* eslint-disable @next/next/no-img-element */
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { ImageIcon, X, ZoomIn, ExternalLink, Loader2, Search, RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
@@ -51,14 +52,7 @@ export function ScreenshotViewer({ screenshotUrl, taskCode, taskTitle }: Screens
   const driveSearchQuery = encodeURIComponent((taskTitle || taskCode || "").trim());
   const driveSearchUrl = `https://drive.google.com/drive/search?q=${driveSearchQuery}`;
 
-  // Reset state when modal opens or screenshotUrl changes
-  useEffect(() => {
-    if (open) {
-      setUrlIndex(0);
-      setLoaded(false);
-      setAllFailed(false);
-    }
-  }, [open, screenshotUrl]);
+
 
   function handleImgError() {
     const nextIndex = urlIndex + 1;
@@ -108,7 +102,12 @@ export function ScreenshotViewer({ screenshotUrl, taskCode, taskTitle }: Screens
           type="button"
           variant="outline"
           size="sm"
-          onClick={() => setOpen(true)}
+          onClick={() => {
+            setUrlIndex(0);
+            setLoaded(false);
+            setAllFailed(false);
+            setOpen(true);
+          }}
           className="h-9 gap-2 text-xs font-medium border-violet-200 text-violet-700 hover:bg-violet-50 hover:border-violet-300 dark:border-violet-800 dark:text-violet-400 dark:hover:bg-violet-950/50 transition-all flex-1"
         >
           <ImageIcon className="w-3.5 h-3.5" />

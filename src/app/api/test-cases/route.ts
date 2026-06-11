@@ -3,8 +3,9 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/auth";
 import { db } from "@/db";
 import { testCases, NewTestCase, testPlans, projectMembers, projects } from "@/db/schema";
-import { eq, and, desc } from "drizzle-orm";
+import { eq, and } from "drizzle-orm";
 import { randomUUID } from "crypto";
+import { authorizeProjectRole } from "@/lib/auth-helpers";
 
 export async function GET(request: Request) {
   const session = await getServerSession(authOptions);
@@ -81,14 +82,8 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Test plan not found" }, { status: 400 });
   }
 
-  const member = await db
-    .select()
-    .from(projectMembers)
-    .where(and(eq(projectMembers.projectId, plan[0].projectId), eq(projectMembers.userId, session.user.id)))
-    .limit(1);
-  if (member.length === 0) {
-    return NextResponse.json({ error: "Access denied" }, { status: 403 });
-  }
+  const auth = await authorizeProjectRole(plan[0].projectId, session.user.id, ["admin", "pm", "qa"]);
+  if (!auth.authorized) return auth.errorResponse!;
 
   const newCase: NewTestCase = {
     id: randomUUID(),
@@ -140,14 +135,8 @@ export async function PUT(request: Request) {
 
   const existing = existingResult[0];
 
-  const member = await db
-    .select()
-    .from(projectMembers)
-    .where(and(eq(projectMembers.projectId, existing.projectId), eq(projectMembers.userId, session.user.id)))
-    .limit(1);
-  if (member.length === 0) {
-    return NextResponse.json({ error: "Access denied" }, { status: 403 });
-  }
+  const auth = await authorizeProjectRole(existing.projectId, session.user.id, ["admin", "pm", "qa"]);
+  if (!auth.authorized) return auth.errorResponse!;
 
   const updated = await db
     .update(testCases)

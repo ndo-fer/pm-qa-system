@@ -1,10 +1,6 @@
 import { jsPDF } from "jspdf";
 import autoTable from "jspdf-autotable";
 
-function isPrimitive(val: unknown): boolean {
-  return val === null || val === undefined || typeof val === "boolean" || typeof val === "number" || typeof val === "string";
-}
-
 function flattenCell(val: unknown): string {
   if (val === null || val === undefined) return "";
   if (Array.isArray(val)) return `[${val.length} items]`;
@@ -21,13 +17,13 @@ function hasNested(val: unknown): boolean {
 
 const SKIP_KEYS = new Set(["id", "projectId", "testPlanId", "assigneeId", "executedBy"]);
 
-function getHeaders(data: Record<string, any>[]): string[] {
+function getHeaders(data: Record<string, unknown>[]): string[] {
   return Array.from(
     new Set(data.flatMap(item => Object.keys(item)))
   ).filter(k => !SKIP_KEYS.has(k));
 }
 
-export function exportToCSV(data: Record<string, any>[], filename: string) {
+export function exportToCSV(data: Record<string, unknown>[], filename: string) {
   if (!data || data.length === 0) {
     alert("No data available to export.");
     return;
@@ -61,7 +57,7 @@ export function exportToCSV(data: Record<string, any>[], filename: string) {
   document.body.removeChild(link);
 }
 
-export function exportToPDF(data: Record<string, any>[], filename: string) {
+export function exportToPDF(data: Record<string, unknown>[], filename: string) {
   if (!data || data.length === 0) {
     alert("No data available to export.");
     return;
@@ -133,8 +129,8 @@ export function exportToPDF(data: Record<string, any>[], filename: string) {
         addPageIfNeeded(20);
         sectionTitle(key.replace(/([A-Z])/g, " $1").replace(/^./, s => s.toUpperCase()));
 
-        const arrHeaders = getHeaders(val);
-        const arrRows = val.map((v: any) =>
+        const arrHeaders = getHeaders(val as Record<string, unknown>[]);
+        const arrRows = (val as Record<string, unknown>[]).map((v) =>
           arrHeaders.map(h => flattenCell(v[h]))
         );
 
@@ -149,13 +145,13 @@ export function exportToPDF(data: Record<string, any>[], filename: string) {
           tableLineColor: [220, 220, 220],
           tableLineWidth: 0.25,
         });
-        cursorY = (doc as any).lastAutoTable.finalY + 10;
+        cursorY = (doc as jsPDF & { lastAutoTable: { finalY: number } }).lastAutoTable.finalY + 10;
       } else if (typeof val === "object" && val !== null && !Array.isArray(val)) {
         addPageIfNeeded(20);
         sectionTitle(key.replace(/([A-Z])/g, " $1").replace(/^./, s => s.toUpperCase()));
 
         const objHeaders = Object.keys(val).filter(k => !SKIP_KEYS.has(k));
-        const objRows = [objHeaders.map(h => flattenCell((val as any)[h]))];
+        const objRows = [objHeaders.map(h => flattenCell((val as Record<string, unknown>)[h]))];
 
         autoTable(doc, {
           head: [objHeaders],
@@ -168,7 +164,7 @@ export function exportToPDF(data: Record<string, any>[], filename: string) {
           tableLineColor: [220, 220, 220],
           tableLineWidth: 0.25,
         });
-        cursorY = (doc as any).lastAutoTable.finalY + 10;
+        cursorY = (doc as jsPDF & { lastAutoTable: { finalY: number } }).lastAutoTable.finalY + 10;
       }
     }
   } else {
@@ -217,7 +213,7 @@ export function exportToPDF(data: Record<string, any>[], filename: string) {
   doc.save(`${filename}.pdf`);
 }
 
-export function exportToJSON(data: any, filename: string) {
+export function exportToJSON(data: unknown, filename: string) {
   if (!data) {
     alert("No data available to export.");
     return;

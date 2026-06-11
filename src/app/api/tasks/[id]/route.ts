@@ -27,7 +27,7 @@ const taskUpdateSchema = z.object({
   isArchived: z.number().optional(),
   erpRole: z.enum(["administrator", "top_user", "user", "all_roles"]).optional(),
   screenshotUrl: z.string().nullable().optional(),
-  roleSpecificFeatures: z.any().nullable().optional(),
+  roleSpecificFeatures: z.unknown().nullable().optional(),
 });
 
 export async function GET(request: Request, { params }: { params: Promise<{ id: string }> }) {
@@ -46,10 +46,10 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
 
   const { id } = await params;
   
-  let body: any;
+  let body: unknown;
   try {
     body = await request.json();
-  } catch (e) {
+  } catch {
     return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
   }
 

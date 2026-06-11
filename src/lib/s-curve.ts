@@ -1,6 +1,14 @@
 import { db } from "@/db";
-import { projects, tasks, milestones } from "@/db/schema";
+import { projects, tasks, milestones, Milestone, Task } from "@/db/schema";
 import { eq } from "drizzle-orm";
+
+export interface SCurveTargetPoint {
+  week: number;
+  weekStart: string;
+  weekEnd: string;
+  plannedCumulative: number;
+  targetMilestone?: string | null;
+}
 
 export interface SCurveDataPoint {
   week: number;
@@ -19,10 +27,19 @@ export interface SCurveDataPoint {
 }
 
 function toLocalYMD(date: Date): string {
-  const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, "0");
-  const day = String(date.getDate()).padStart(2, "0");
+  const year = date.getUTCFullYear();
+  const month = String(date.getUTCMonth() + 1).padStart(2, "0");
+  const day = String(date.getUTCDate()).padStart(2, "0");
   return `${year}-${month}-${day}`;
+}
+
+function parseDbDate(dateStr: string | null | undefined): Date {
+  if (!dateStr) return new Date();
+  let normalized = dateStr.includes(" ") ? dateStr.replace(" ", "T") : dateStr;
+  if (!normalized.endsWith("Z") && !normalized.includes("+") && !/-\d{2}:\d{2}$/.test(normalized)) {
+    normalized += "Z";
+  }
+  return new Date(normalized);
 }
 
 export async function calculateSCurve(projectId: string): Promise<SCurveDataPoint[]> {
@@ -31,16 +48,16 @@ export async function calculateSCurve(projectId: string): Promise<SCurveDataPoin
   if (projectList.length === 0) return [];
   const project = projectList[0];
 
-  let sCurveTarget: any[] = [];
+  let sCurveTarget: SCurveTargetPoint[] = [];
   if (project.sCurveTarget) {
     if (typeof project.sCurveTarget === "string") {
       try {
-        sCurveTarget = JSON.parse(project.sCurveTarget);
+        sCurveTarget = JSON.parse(project.sCurveTarget) as SCurveTargetPoint[];
       } catch (e) {
         console.error("Failed to parse sCurveTarget string:", e);
       }
     } else if (Array.isArray(project.sCurveTarget)) {
-      sCurveTarget = project.sCurveTarget;
+      sCurveTarget = project.sCurveTarget as SCurveTargetPoint[];
     }
   }
   if (sCurveTarget.length === 0) return [];
@@ -59,8 +76,8 @@ export async function calculateSCurve(projectId: string): Promise<SCurveDataPoin
   });
 
   return sCurveTarget.map((w) => {
-    const weekEnd = new Date(w.weekEnd + "T23:59:59");
-    const weekStart = new Date(w.weekStart + "T00:00:00");
+    const weekEnd = new Date(w.weekEnd + "T23:59:59Z");
+    const weekStart = new Date(w.weekStart + "T00:00:00Z");
 
     // If the week hasn't started yet relative to today, actualCumulative is null
     if (weekStart > today) {
@@ -82,7 +99,7 @@ export async function calculateSCurve(projectId: string): Promise<SCurveDataPoin
       const phaseTasks = taskList.filter((t) => t.phase === m.phase);
       if (phaseTasks.length === 0) {
         // If no tasks are defined yet but it's passed target endDate, assume 0.0 or completed if milestone is done
-        if (m.endDate && new Date(m.endDate + "T23:59:59") <= weekEnd) {
+        if (m.endDate && new Date(m.endDate + "T23:59:59Z") <= weekEnd) {
           totalActual += (m.status === "completed" ? 1.0 : 0.0) * weight;
         }
         return;
@@ -90,17 +107,7 @@ export async function calculateSCurve(projectId: string): Promise<SCurveDataPoin
 
       let phaseProgressSum = 0;
       phaseTasks.forEach((t) => {
-        // Parse sqlite date strings properly
-        // In sqlite, updatedAt might be stored as YYYY-MM-DD HH:MM:SS or ISO string.
-        let taskUpdateDate = new Date();
-        if (t.updatedAt) {
-          // If it doesn't contain T, convert space to T for cross-browser parsing
-          const dateStr = t.updatedAt.includes("T") ? t.updatedAt : t.updatedAt.replace(" ", "T");
-          taskUpdateDate = new Date(dateStr);
-        } else if (t.createdAt) {
-          const dateStr = t.createdAt.includes("T") ? t.createdAt : t.createdAt.replace(" ", "T");
-          taskUpdateDate = new Date(dateStr);
-        }
+        const taskUpdateDate = parseDbDate(t.updatedAt || t.createdAt);
 
         // If the task was completed or updated before/during this week
         if (taskUpdateDate <= weekEnd) {
@@ -127,36 +134,28 @@ export async function calculateSCurve(projectId: string): Promise<SCurveDataPoin
     const completedTasks = taskList
       .filter((t) => {
         if (t.status !== "done") return false;
-        let taskUpdateDate = new Date();
-        if (t.updatedAt) {
-          const dateStr = t.updatedAt.includes("T") ? t.updatedAt : t.updatedAt.replace(" ", "T");
-          taskUpdateDate = new Date(dateStr);
-        } else if (t.createdAt) {
-          const dateStr = t.createdAt.includes("T") ? t.createdAt : t.createdAt.replace(" ", "T");
-          taskUpdateDate = new Date(dateStr);
-        }
+        const taskUpdateDate = parseDbDate(t.updatedAt || t.createdAt);
         return taskUpdateDate >= weekStart && taskUpdateDate <= weekEnd;
       })
       .map((t) => {
-        let taskUpdateDate = new Date();
-        if (t.updatedAt) {
-          const dateStr = t.updatedAt.includes("T") ? t.updatedAt : t.updatedAt.replace(" ", "T");
-          taskUpdateDate = new Date(dateStr);
-        } else if (t.createdAt) {
-          const dateStr = t.createdAt.includes("T") ? t.createdAt : t.createdAt.replace(" ", "T");
-          taskUpdateDate = new Date(dateStr);
-        }
+        const taskUpdateDate = parseDbDate(t.updatedAt || t.createdAt);
         return {
           id: t.id,
           title: t.title,
           phase: t.phase || "",
           taskCode: t.taskCode || null,
           completedAt: toLocalYMD(taskUpdateDate),
-          rawDate: taskUpdateDate.getTime()
+          taskUpdateDateTime: taskUpdateDate.getTime()
         };
       })
-      .sort((a, b) => b.rawDate - a.rawDate)
-      .map(({ rawDate, ...rest }) => rest);
+      .sort((a, b) => b.taskUpdateDateTime - a.taskUpdateDateTime)
+      .map((t) => ({
+        id: t.id,
+        title: t.title,
+        phase: t.phase,
+        taskCode: t.taskCode,
+        completedAt: t.completedAt
+      }));
 
     return {
       week: w.week,
@@ -233,8 +232,8 @@ export async function calculateSCurveGroup(projectId: string): Promise<SCurveGro
     "January", "February", "March", "April", "May", "June",
     "July", "August", "September", "October", "November", "December"
   ];
-  const activeDate = activeWeek ? new Date(activeWeek.weekEnd + "T00:00:00") : today;
-  const monthName = MONTH_NAMES[activeDate.getMonth()] + " " + activeDate.getFullYear();
+  const activeDate = activeWeek ? new Date(activeWeek.weekEnd + "T00:00:00Z") : today;
+  const monthName = MONTH_NAMES[activeDate.getUTCMonth()] + " " + activeDate.getUTCFullYear();
 
   const monthlyWeeks = overall.filter((w) => {
     return w.weekEnd.startsWith(activeMonthStr) || w.weekStart.startsWith(activeMonthStr);
@@ -252,14 +251,14 @@ export async function calculateSCurveGroup(projectId: string): Promise<SCurveGro
     });
 
     const prevPlanned = currentWeekIndex > 0 ? overall[currentWeekIndex - 1].plannedCumulative : 0;
-    const weekStart = new Date(activeWeek.weekStart + "T00:00:00");
+    const weekStart = new Date(activeWeek.weekStart + "T00:00:00Z");
 
     for (let j = 0; j < 7; j++) {
       const dayDate = new Date(weekStart.getTime() + j * 24 * 60 * 60 * 1000);
       const dayDateStr = toLocalYMD(dayDate);
 
       const dayNames = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
-      const dayIndex = (dayDate.getDay() + 6) % 7;
+      const dayIndex = (dayDate.getUTCDay() + 6) % 7;
       const dayName = dayNames[dayIndex];
 
       const plannedVal = prevPlanned + ((j + 1) / 7) * (activeWeek.plannedCumulative - prevPlanned);
@@ -271,41 +270,33 @@ export async function calculateSCurveGroup(projectId: string): Promise<SCurveGro
       if (!isFuture) {
         actualVal = calculateActualProgressAtDate(dayDateStr, milestoneList, taskList, phaseWeights);
 
-        const dayStart = new Date(dayDateStr + "T00:00:00");
-        const dayEnd = new Date(dayDateStr + "T23:59:59");
+        const dayStart = new Date(dayDateStr + "T00:00:00Z");
+        const dayEnd = new Date(dayDateStr + "T23:59:59Z");
         dayCompletedTasks = taskList
           .filter((t) => {
             if (t.status !== "done") return false;
-            let taskUpdateDate = new Date();
-            if (t.updatedAt) {
-              const dateStr = t.updatedAt.includes("T") ? t.updatedAt : t.updatedAt.replace(" ", "T");
-              taskUpdateDate = new Date(dateStr);
-            } else if (t.createdAt) {
-              const dateStr = t.createdAt.includes("T") ? t.createdAt : t.createdAt.replace(" ", "T");
-              taskUpdateDate = new Date(dateStr);
-            }
+            const taskUpdateDate = parseDbDate(t.updatedAt || t.createdAt);
             return taskUpdateDate >= dayStart && taskUpdateDate <= dayEnd;
           })
           .map((t) => {
-            let taskUpdateDate = new Date();
-            if (t.updatedAt) {
-              const dateStr = t.updatedAt.includes("T") ? t.updatedAt : t.updatedAt.replace(" ", "T");
-              taskUpdateDate = new Date(dateStr);
-            } else if (t.createdAt) {
-              const dateStr = t.createdAt.includes("T") ? t.createdAt : t.createdAt.replace(" ", "T");
-              taskUpdateDate = new Date(dateStr);
-            }
+            const taskUpdateDate = parseDbDate(t.updatedAt || t.createdAt);
             return {
               id: t.id,
               title: t.title,
               phase: t.phase || "",
               taskCode: t.taskCode || null,
               completedAt: toLocalYMD(taskUpdateDate),
-              rawDate: taskUpdateDate.getTime()
+              taskUpdateDateTime: taskUpdateDate.getTime()
             };
           })
-          .sort((a, b) => b.rawDate - a.rawDate)
-          .map(({ rawDate, ...rest }) => rest);
+          .sort((a, b) => b.taskUpdateDateTime - a.taskUpdateDateTime)
+          .map((t) => ({
+            id: t.id,
+            title: t.title,
+            phase: t.phase,
+            taskCode: t.taskCode,
+            completedAt: t.completedAt
+          }));
       }
 
       weeklyDays.push({
@@ -333,18 +324,18 @@ export async function calculateSCurveGroup(projectId: string): Promise<SCurveGro
 
 function calculateActualProgressAtDate(
   dateStr: string,
-  milestoneList: any[],
-  taskList: any[],
+  milestoneList: Milestone[],
+  taskList: Task[],
   phaseWeights: Record<string, number>
 ): number {
-  const cutoff = new Date(dateStr + "T23:59:59");
+  const cutoff = new Date(dateStr + "T23:59:59Z");
   let totalActual = 0;
 
   milestoneList.forEach((m) => {
     const weight = phaseWeights[m.phase] || 0;
     const phaseTasks = taskList.filter((t) => t.phase === m.phase);
     if (phaseTasks.length === 0) {
-      if (m.endDate && new Date(m.endDate + "T23:59:59") <= cutoff) {
+      if (m.endDate && new Date(m.endDate + "T23:59:59Z") <= cutoff) {
         totalActual += (m.status === "completed" ? 1.0 : 0.0) * weight;
       }
       return;
@@ -352,14 +343,7 @@ function calculateActualProgressAtDate(
 
     let phaseProgressSum = 0;
     phaseTasks.forEach((t) => {
-      let taskUpdateDate = new Date();
-      if (t.updatedAt) {
-        const dateStr = t.updatedAt.includes("T") ? t.updatedAt : t.updatedAt.replace(" ", "T");
-        taskUpdateDate = new Date(dateStr);
-      } else if (t.createdAt) {
-        const dateStr = t.createdAt.includes("T") ? t.createdAt : t.createdAt.replace(" ", "T");
-        taskUpdateDate = new Date(dateStr);
-      }
+      const taskUpdateDate = parseDbDate(t.updatedAt || t.createdAt);
 
       if (taskUpdateDate <= cutoff) {
         if (t.status === "done") {

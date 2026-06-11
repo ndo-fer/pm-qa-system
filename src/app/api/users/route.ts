@@ -53,22 +53,35 @@ export async function POST(request: Request) {
     role: userRole,
   };
 
-  let safeUser: Omit<NewUser, "passwordHash">;
+  let safeUser: {
+    id: string;
+    name: string;
+    email: string;
+    role: "admin" | "pm" | "developer" | "qa";
+    createdAt: string | null;
+  };
 
   // Atomically create user and assign to all existing projects
   await db.transaction(async (tx) => {
     const [created] = await tx.insert(users).values(newUser).returning();
-    const { passwordHash: _, ...rest } = created;
-    safeUser = rest;
+    safeUser = {
+      id: created.id,
+      name: created.name,
+      email: created.email,
+      role: created.role,
+      createdAt: created.createdAt,
+    };
 
     const allProjects = await tx.select().from(projects);
-    for (const p of allProjects) {
-      await tx.insert(projectMembers).values({
-        id: randomUUID(),
-        projectId: p.id,
-        userId: created.id,
-        role: userRole,
-      });
+    if (allProjects.length > 0) {
+      await tx.insert(projectMembers).values(
+        allProjects.map((p) => ({
+          id: randomUUID(),
+          projectId: p.id,
+          userId: created.id,
+          role: userRole,
+        }))
+      );
     }
   });
 
@@ -90,7 +103,11 @@ export async function PUT(request: Request) {
   const existing = await db.select().from(users).where(eq(users.id, body.id)).limit(1);
   if (existing.length === 0) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
-  const updateData: any = {
+  const updateData: {
+    name: string;
+    role: "admin" | "pm" | "developer" | "qa";
+    passwordHash?: string;
+  } = {
     name: body.name ?? existing[0].name,
     role: body.role ?? existing[0].role,
   };
@@ -99,12 +116,24 @@ export async function PUT(request: Request) {
     updateData.passwordHash = await bcrypt.hash(body.password, 10);
   }
 
-  let safeUser: any;
+  let safeUser: {
+    id: string;
+    name: string;
+    email: string;
+    role: "admin" | "pm" | "developer" | "qa";
+    createdAt: string | null;
+  } | null = null;
 
   await db.transaction(async (tx) => {
     const updated = await tx.update(users).set(updateData).where(eq(users.id, body.id)).returning();
-    const { passwordHash: _, ...rest } = updated[0];
-    safeUser = rest;
+    const created = updated[0];
+    safeUser = {
+      id: created.id,
+      name: created.name,
+      email: created.email,
+      role: created.role,
+      createdAt: created.createdAt,
+    };
 
     // Keep project member roles synchronized with global user roles
     if (body.role) {

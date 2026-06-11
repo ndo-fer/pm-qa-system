@@ -1,9 +1,9 @@
+/* eslint-disable react-hooks/set-state-in-effect */
 "use client";
 
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Badge } from "@/components/ui/badge";
 import {
   Dialog,
   DialogContent,
@@ -119,13 +119,6 @@ export function ProjectForm({ open, onOpenChange, project, onSuccess }: ProjectF
     setLoading(false);
   }
 
-
-  const statusColors: Record<string, string> = {
-    planned: "bg-gray-500",
-    active: "bg-green-500",
-    on_hold: "bg-yellow-500",
-    completed: "bg-blue-500",
-  };
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>

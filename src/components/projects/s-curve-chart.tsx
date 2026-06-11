@@ -1,3 +1,4 @@
+/* eslint-disable react-hooks/set-state-in-effect */
 "use client";
 
 import { useState, useEffect } from "react";
@@ -10,6 +11,109 @@ interface SCurveChartProps {
   sCurveGroup: SCurveGroup;
 }
 
+interface CustomTooltipProps {
+  active?: boolean;
+  payload?: Array<{
+    payload: {
+      day?: string;
+      date?: string;
+      week?: number;
+      weekStart?: string;
+      weekEnd?: string;
+      targetMilestone?: string | null;
+      plannedCumulative: number;
+      actualCumulative: number | null;
+      completedTasks?: Array<{
+        id: string;
+        taskCode?: string | null;
+        phase?: string | null;
+        title: string;
+      }>;
+    };
+  }>;
+  view: "weekly" | "monthly" | "overall";
+}
+
+const CustomTooltip = ({ active, payload, view }: CustomTooltipProps) => {
+  if (active && payload && payload.length) {
+    const isWeekly = view === "weekly";
+    const title = isWeekly 
+      ? `${payload[0].payload.day} (${payload[0].payload.date})` 
+      : `Week ${payload[0].payload.week}`;
+    const subtitle = isWeekly
+      ? null
+      : `${payload[0].payload.weekStart} to ${payload[0].payload.weekEnd}`;
+    const milestone = isWeekly
+      ? null
+      : payload[0].payload.targetMilestone;
+
+    const plannedCumulative = payload[0].payload.plannedCumulative;
+    const actualCumulative = payload[0].payload.actualCumulative;
+    const completedTasks = payload[0].payload.completedTasks || [];
+
+    return (
+      <div className="bg-slate-950/95 text-white p-3.5 rounded-xl border border-slate-800 shadow-2xl backdrop-blur-md text-xs space-y-2.5 w-64 md:w-72 max-w-sm pointer-events-auto">
+        <div>
+          <p className="font-bold text-sm tracking-tight">{title}</p>
+          {subtitle && <p className="text-slate-400 text-[10px] mt-0.5">{subtitle}</p>}
+          {milestone && (
+            <p className="text-amber-400 font-semibold text-[10px] mt-1">Target Phase: {milestone}</p>
+          )}
+        </div>
+        <div className="border-t border-slate-800/80 pt-2 space-y-1">
+          <div className="text-blue-400 flex justify-between gap-4 text-[11px] font-medium">
+            <span>Planned:</span>
+            <span className="font-bold">{(plannedCumulative * 100).toFixed(1)}%</span>
+          </div>
+          {actualCumulative !== null && (
+            <div className="text-emerald-400 flex justify-between gap-4 text-[11px] font-medium">
+              <span>Actual:</span>
+              <span className="font-bold">{(actualCumulative * 100).toFixed(1)}%</span>
+            </div>
+          )}
+        </div>
+
+        {completedTasks.length > 0 && (
+          <div className="border-t border-slate-800/80 pt-2 space-y-1.5">
+            <div className="font-semibold text-slate-350 text-[10px] uppercase tracking-wider mb-1 flex items-center gap-1.5">
+              <span className="inline-block w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+              Completed ({completedTasks.length}):
+            </div>
+            <div className="space-y-1">
+              {completedTasks.slice(0, 3).map((task) => (
+                <div 
+                  key={task.id} 
+                  className="flex flex-col gap-0.5 bg-slate-900/40 p-1.5 rounded border border-slate-800/50"
+                >
+                  <div className="flex items-center gap-1.5">
+                    {task.taskCode && (
+                      <span className="text-[9px] font-mono font-bold text-slate-400 bg-slate-800 px-1 py-0.2 rounded">
+                        {task.taskCode}
+                      </span>
+                    )}
+                    <span className="text-[9px] font-bold text-emerald-400 uppercase tracking-wide">
+                      {task.phase}
+                    </span>
+                  </div>
+                  <p className="text-[11px] text-slate-200 font-medium leading-tight truncate">
+                    {task.title}
+                  </p>
+                </div>
+              ))}
+              {completedTasks.length > 3 && (
+                <p className="text-[9.5px] text-slate-400 italic text-center pt-0.5">
+                  + {completedTasks.length - 3} more tasks
+                </p>
+              )}
+            </div>
+          </div>
+        )}
+      </div>
+    );
+  }
+  return null;
+};
+
 export function SCurveChart({ sCurveGroup }: SCurveChartProps) {
   const [view, setView] = useState<"weekly" | "monthly" | "overall">("overall");
   const [mounted, setMounted] = useState(false);
@@ -21,87 +125,6 @@ export function SCurveChart({ sCurveGroup }: SCurveChartProps) {
 
   // Format percentage helper
   const formatPercent = (value: number) => `${Math.round(value * 100)}%`;
-
-  // Custom Tooltip component
-  const CustomTooltip = ({ active, payload }: any) => {
-    if (active && payload && payload.length) {
-      const isWeekly = view === "weekly";
-      const title = isWeekly 
-        ? `${payload[0].payload.day} (${payload[0].payload.date})` 
-        : `Week ${payload[0].payload.week}`;
-      const subtitle = isWeekly
-        ? null
-        : `${payload[0].payload.weekStart} to ${payload[0].payload.weekEnd}`;
-      const milestone = isWeekly
-        ? null
-        : payload[0].payload.targetMilestone;
-
-      const plannedCumulative = payload[0].payload.plannedCumulative;
-      const actualCumulative = payload[0].payload.actualCumulative;
-      const completedTasks = payload[0].payload.completedTasks || [];
-
-      return (
-        <div className="bg-slate-950/95 text-white p-3.5 rounded-xl border border-slate-800 shadow-2xl backdrop-blur-md text-xs space-y-2.5 w-64 md:w-72 max-w-sm pointer-events-auto">
-          <div>
-            <p className="font-bold text-sm tracking-tight">{title}</p>
-            {subtitle && <p className="text-slate-400 text-[10px] mt-0.5">{subtitle}</p>}
-            {milestone && (
-              <p className="text-amber-400 font-semibold text-[10px] mt-1">Target Phase: {milestone}</p>
-            )}
-          </div>
-          <div className="border-t border-slate-800/80 pt-2 space-y-1">
-            <div className="text-blue-400 flex justify-between gap-4 text-[11px] font-medium">
-              <span>Planned:</span>
-              <span className="font-bold">{(plannedCumulative * 100).toFixed(1)}%</span>
-            </div>
-            {actualCumulative !== null && (
-              <div className="text-emerald-400 flex justify-between gap-4 text-[11px] font-medium">
-                <span>Actual:</span>
-                <span className="font-bold">{(actualCumulative * 100).toFixed(1)}%</span>
-              </div>
-            )}
-          </div>
-
-          {completedTasks.length > 0 && (
-            <div className="border-t border-slate-800/80 pt-2 space-y-1.5">
-              <div className="font-semibold text-slate-350 text-[10px] uppercase tracking-wider mb-1 flex items-center gap-1.5">
-                <span className="inline-block w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                Completed ({completedTasks.length}):
-              </div>
-              <div className="space-y-1">
-                {completedTasks.slice(0, 3).map((task: any) => (
-                  <div 
-                    key={task.id} 
-                    className="flex flex-col gap-0.5 bg-slate-900/40 p-1.5 rounded border border-slate-800/50"
-                  >
-                    <div className="flex items-center gap-1.5">
-                      {task.taskCode && (
-                        <span className="text-[9px] font-mono font-bold text-slate-400 bg-slate-800 px-1 py-0.2 rounded">
-                          {task.taskCode}
-                        </span>
-                      )}
-                      <span className="text-[9px] font-bold text-emerald-400 uppercase tracking-wide">
-                        {task.phase}
-                      </span>
-                    </div>
-                    <p className="text-[11px] text-slate-200 font-medium leading-tight truncate">
-                      {task.title}
-                    </p>
-                  </div>
-                ))}
-                {completedTasks.length > 3 && (
-                  <p className="text-[9.5px] text-slate-400 italic text-center pt-0.5">
-                    + {completedTasks.length - 3} more tasks
-                  </p>
-                )}
-              </div>
-            </div>
-          )}
-        </div>
-      );
-    }
-    return null;
-  };
 
   // Find latest actual progress and calculate deviance
   let currentActual = 0;
@@ -133,10 +156,10 @@ export function SCurveChart({ sCurveGroup }: SCurveChartProps) {
       : view === "monthly"
       ? sCurveGroup.monthly.weeks
       : sCurveGroup.overall
-  ) as any[];
+  ) as (SCurveDataPoint | SCurveDailyPoint)[];
 
   const xAxisKey = view === "weekly" ? "day" : "week";
-  const tickFormatter = view === "weekly" ? (v: any) => v : (v: any) => `W${v}`;
+  const tickFormatter = view === "weekly" ? (v: string | number) => String(v) : (v: string | number) => `W${v}`;
 
   if (!mounted) {
     return (
@@ -219,7 +242,7 @@ export function SCurveChart({ sCurveGroup }: SCurveChartProps) {
                 tick={{ fontSize: 11, fill: "#64748b" }}
                 domain={[0, 1]}
               />
-              <Tooltip content={<CustomTooltip />} allowEscapeViewBox={{ x: true, y: true }} />
+              <Tooltip content={<CustomTooltip view={view} />} allowEscapeViewBox={{ x: true, y: true }} />
               <Legend verticalAlign="top" height={36} />
               <Line
                 name="Planned Progress"

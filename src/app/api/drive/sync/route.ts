@@ -74,7 +74,7 @@ async function collectImageFilesRecursive(
   let pageToken: string | undefined;
 
   do {
-    const res: any = await drive.files.list({
+    const res = await drive.files.list({
       q: `'${folderId}' in parents and trashed = false`,
       fields: "nextPageToken, files(id, name, mimeType, webViewLink)",
       pageSize: 200,
@@ -323,8 +323,8 @@ export async function GET() {
       tasksMatchedViaFilename: directMatched,
       tasksWithNoScreenshot: unmatched,
     });
-  } catch (err: any) {
-    console.error("[Drive Sync]", err?.message || err);
-    return NextResponse.json({ success: false, error: err?.message || String(err) }, { status: 500 });
+  } catch (err) {
+    console.error("[Drive Sync]", (err as Error).message || err);
+    return NextResponse.json({ success: false, error: (err as Error).message || String(err) }, { status: 500 });
   }
 }

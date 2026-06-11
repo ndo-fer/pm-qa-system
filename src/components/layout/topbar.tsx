@@ -20,9 +20,11 @@ export function TopBar() {
       <div className="flex items-center gap-3">
         {session?.user && (
           <>
-            <Badge variant="secondary">{roleLabels[(session.user as any).role] || "User"}</Badge>
-            <span className="text-sm font-medium">{session.user.name}</span>
-            <Button variant="outline" size="sm" onClick={() => signOut({ callbackUrl: "/login" })}>
+            <span className="text-sm font-semibold text-slate-700">{session.user.name}</span>
+            <Badge variant="secondary" className="font-semibold bg-slate-100 text-slate-600 border-slate-200 hover:bg-slate-100">
+              {roleLabels[(session.user as { role?: string }).role || ""] || "User"}
+            </Badge>
+            <Button variant="outline" size="sm" className="h-8 text-xs font-medium" onClick={() => signOut({ callbackUrl: "/login" })}>
               Logout
             </Button>
           </>

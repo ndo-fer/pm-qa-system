@@ -1,25 +1,20 @@
 "use client";
 
-import { useState, useRef } from "react";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { useState } from "react";
+import { Dialog, DialogContent, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { 
   Play, 
   Pencil, 
-  X, 
   CheckCircle2, 
   XCircle, 
   AlertCircle, 
   Clock, 
   Key, 
-  Shield, 
   FileText, 
   ListTodo, 
   HelpCircle,
-  Calendar,
-  User,
-  Activity,
   Copy,
   Check
 } from "lucide-react";
@@ -38,7 +33,7 @@ interface TestCase {
   executedAt?: string | null;
   erpRole?: string | null;
   testType?: string | null;
-  loginCredentials?: any;
+  loginCredentials?: Record<string, unknown> | null;
 }
 
 interface TestCasePreviewModalProps {
@@ -95,35 +90,44 @@ export function TestCasePreviewModal({
     setTimeout(() => setCopied(false), 2000);
   };
 
-  // Helper to render steps dynamically. Numbered items count sequentially, ignoring headers.
-  let stepCounter = 1;
-  const renderStep = (step: string, idx: number) => {
+  // Pre-calculate step numbers to avoid mutation in rendering callbacks
+  const stepsWithNumbers: { step: string; isHeader: boolean; num: number | null }[] = [];
+  let stepNumTracker = 1;
+  for (let i = 0; i < stepsArray.length; i++) {
+    const step = stepsArray[i];
     const isHeader = step.endsWith(":") || 
                      step.startsWith("👑") || 
                      step.startsWith("👤") || 
                      step.startsWith("⭐") || 
                      step.includes("Scenarios") ||
                      step.includes("Role");
-
     if (isHeader) {
+      stepsWithNumbers.push({ step, isHeader, num: null });
+    } else {
+      stepsWithNumbers.push({ step, isHeader, num: stepNumTracker });
+      stepNumTracker += 1;
+    }
+  }
+
+  const renderStep = (item: { step: string; isHeader: boolean; num: number | null }, idx: number) => {
+    if (item.isHeader) {
       return (
         <div key={idx} className="pt-3 pb-1 first:pt-0">
           <h4 className="text-xs font-bold text-slate-800 flex items-center gap-2 border-b pb-1.5 text-slate-900 border-slate-100">
-            {step}
+            {item.step}
           </h4>
         </div>
       );
     }
 
-    const currentNum = stepCounter;
-    stepCounter += 1;
+    const cleanStepText = item.step.replace(/^\d+\.\s*/, "");
 
     return (
       <div key={idx} className="flex gap-3 text-xs text-slate-700 leading-relaxed pl-1.5">
         <span className="font-mono font-bold text-slate-500 bg-slate-100 w-5 h-5 flex items-center justify-center rounded flex-shrink-0 mt-0.5">
-          {currentNum}
+          {item.num}
         </span>
-        <span className="pt-0.5">{step}</span>
+        <span className="pt-0.5">{cleanStepText}</span>
       </div>
     );
   };
@@ -165,7 +169,7 @@ export function TestCasePreviewModal({
               </h3>
               {stepsArray.length > 0 ? (
                 <div className="space-y-2.5">
-                  {stepsArray.map((step, idx) => renderStep(step, idx))}
+                  {stepsWithNumbers.map((item, idx) => renderStep(item, idx))}
                 </div>
               ) : (
                 <p className="text-xs text-slate-400 italic py-2">No steps defined for this scenario.</p>

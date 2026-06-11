@@ -1,8 +1,8 @@
+/* eslint-disable react-hooks/set-state-in-effect */
 "use client";
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
-import { useParams } from "next/navigation";
 import { AppLayout } from "@/components/layout/app-layout";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -44,8 +44,7 @@ const statusLabels: Record<string, string> = {
 };
 
 export default function ProjectsPage() {
-  const params = useParams();
-  const projectCodeParam = params?.projectCode as string;
+
   
   const { data: session, update } = useSession();
   const activeProjectId = session?.user?.projectId;
@@ -79,7 +78,7 @@ export default function ProjectsPage() {
     setSwitchingId(projectId);
     if (update) {
       await update({ projectId, projectCode: targetProjectCode });
-      window.location.href = `/${targetProjectCode}/projects`;
+      window.location.assign(`/${targetProjectCode}/projects`);
     }
   }
 
@@ -123,7 +122,7 @@ export default function ProjectsPage() {
               ) : projects.length === 0 ? (
                 <TableRow>
                   <TableCell colSpan={7} className="text-center py-8 text-gray-500">
-                    No projects yet. Click "New Project" to create one.
+                    No projects yet. Click &quot;New Project&quot; to create one.
                   </TableCell>
                 </TableRow>
               ) : (
