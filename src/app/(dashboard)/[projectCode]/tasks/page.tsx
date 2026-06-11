@@ -105,6 +105,21 @@ const priorityLabels: Record<string, string> = {
   urgent: "Urgent",
 };
 
+const moduleFullNames: Record<string, string> = {
+  MST: "Master Data",
+  INV: "Inventory",
+  PUR: "Purchasing",
+  SLS: "Sales",
+  PRD: "Production",
+  AP: "Accounts Payable",
+  AR: "Accounts Receivable",
+  FIN: "Finance",
+  GL: "General Ledger",
+  RPT: "Reporting",
+  ADM: "Administration",
+  BUG: "Bugs & Defects",
+};
+
 export default function TasksPage() {
   const { data: session } = useSession();
   const params = useParams();
@@ -458,7 +473,8 @@ export default function TasksPage() {
                   setFilterPriority("");
                 }
               }}
-              className={`h-14 w-28 flex-shrink-0 rounded-xl border text-left px-3 py-2 transition-all flex flex-col justify-between cursor-grab active:cursor-grabbing ${
+              title={moduleFullNames[s.name] || s.name}
+              className={`h-14 w-28 hover:w-36 flex-shrink-0 rounded-xl border text-left px-3 py-2 transition-all duration-300 ease-in-out flex flex-col justify-between cursor-grab active:cursor-grabbing group ${
                 filterEpic === s.name 
                   ? "bg-blue-600 border-blue-600 text-white font-bold shadow-md shadow-blue-500/25 scale-[1.01]" 
                   : "bg-white border-slate-200 text-slate-700 hover:bg-slate-50 hover:border-slate-350"
@@ -469,8 +485,8 @@ export default function TasksPage() {
               }`}
             >
               <div className="flex items-center justify-between w-full">
-                <span className="text-[10px] uppercase font-black tracking-wider truncate mr-1" title={s.name}>{s.name}</span>
-                <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${
+                <span className="text-[15px] uppercase font-black tracking-wider truncate mr-1 group-hover:text-[16px] transition-all duration-200" title={s.name}>{s.name}</span>
+                <span className={`text-[11px] font-bold px-1.5 py-0.5 rounded ${
                   filterEpic === s.name 
                     ? "bg-blue-700 text-white" 
                     : "bg-slate-100 text-slate-650"
@@ -478,7 +494,8 @@ export default function TasksPage() {
                   {s.total}
                 </span>
               </div>
-              <div className="flex items-center justify-between w-full">
+              {/* Normal state info (Done / Total) */}
+              <div className="flex items-center justify-between w-full group-hover:hidden transition-all duration-200">
                 <span className={`text-[9px] font-semibold leading-none ${filterEpic === s.name ? "text-blue-100" : "text-slate-500"}`}>
                   {s.done}/{s.total} done
                 </span>
@@ -491,6 +508,14 @@ export default function TasksPage() {
                     style={{ width: `${s.total > 0 ? (s.done / s.total) * 100 : 0}%` }}
                   />
                 </div>
+              </div>
+              {/* Hover state info (Full Name) */}
+              <div className="hidden group-hover:flex items-center justify-between w-full transition-all duration-200">
+                <span className={`text-[10px] font-bold truncate leading-none ${
+                  filterEpic === s.name ? "text-blue-100" : "text-blue-600"
+                }`}>
+                  {moduleFullNames[s.name] || s.name}
+                </span>
               </div>
             </button>
           ))}
