@@ -2,8 +2,8 @@ import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/auth";
 import { db } from "@/db";
-import { tasks, NewTask, projectMembers, projects } from "@/db/schema";
-import { eq, and, desc } from "drizzle-orm";
+import { tasks, NewTask, projectMembers, projects, taskContributors, users, notifications } from "@/db/schema";
+import { eq, and, desc, inArray } from "drizzle-orm";
 import { randomUUID } from "crypto";
 import { z } from "zod";
 
@@ -73,7 +73,39 @@ export async function GET(request: Request) {
 
   const allTasks = await db.select().from(tasks).where(and(...conditions)).orderBy(desc(tasks.createdAt));
 
-  return NextResponse.json(allTasks);
+  if (allTasks.length > 0) {
+    const taskIds = allTasks.map((t) => t.id);
+    const contributorsList = await db
+      .select({
+        id: taskContributors.id,
+        taskId: taskContributors.taskId,
+        developerId: taskContributors.developerId,
+        individualProgress: taskContributors.individualProgress,
+        isCurrentActive: taskContributors.isCurrentActive,
+        name: users.name,
+        email: users.email,
+        role: users.role,
+      })
+      .from(taskContributors)
+      .innerJoin(users, eq(taskContributors.developerId, users.id))
+      .where(inArray(taskContributors.taskId, taskIds));
+
+    const contributorsMap = new Map<string, any[]>();
+    for (const c of contributorsList) {
+      if (!contributorsMap.has(c.taskId)) {
+        contributorsMap.set(c.taskId, []);
+      }
+      contributorsMap.get(c.taskId)!.push(c);
+    }
+
+    const tasksWithContributors = allTasks.map((t) => ({
+      ...t,
+      contributors: contributorsMap.get(t.id) || [],
+    }));
+    return NextResponse.json(tasksWithContributors);
+  }
+
+  return NextResponse.json([]);
 }
 
 export async function POST(request: Request) {
@@ -152,6 +184,24 @@ export async function POST(request: Request) {
   };
 
   const [created] = await db.insert(tasks).values(newTask).returning();
+
+  if (created.assigneeId && created.assigneeId !== session.user.id) {
+    const senderName = session.user.name || "Seseorang";
+    try {
+      await db.insert(notifications).values({
+        id: randomUUID(),
+        recipientId: created.assigneeId,
+        senderId: session.user.id,
+        taskId: created.id,
+        title: "Penugasan Tugas Baru",
+        message: `${senderName} menugaskan tugas "${created.title}" kepada Anda.`,
+        isRead: false,
+      });
+    } catch (err) {
+      console.error("Failed to create task assignment notification:", err);
+    }
+  }
+
   return NextResponse.json(created, { status: 201 });
 }
 

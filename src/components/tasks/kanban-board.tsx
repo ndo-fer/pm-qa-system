@@ -4,7 +4,7 @@ import { useState } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Pencil, ArrowLeft, ArrowRight, AlertTriangle, Archive, ArchiveRestore } from "lucide-react";
+import { Pencil, ArrowLeft, ArrowRight, AlertTriangle, Archive, ArchiveRestore, Image } from "lucide-react";
 
 interface Task {
   id: string;
@@ -21,7 +21,16 @@ interface Task {
   phase?: string | null;
   progress?: number;
   blocker?: string | null;
+  screenshotUrl?: string | null;
   isArchived?: number | boolean | null;
+  contributors?: Array<{
+    developerId: string;
+    name: string;
+    email: string;
+    role: string;
+    individualProgress: number;
+    isCurrentActive: boolean;
+  }>;
 }
 
 interface KanbanBoardProps {
@@ -73,6 +82,57 @@ const COLUMNS = [
     badgeBg: "bg-emerald-200 text-emerald-850"
   },
 ];
+
+const renderAvatars = (contributors: any[] = []) => {
+  if (contributors.length === 0) return null;
+  
+  const sorted = [...contributors].sort((a, b) => {
+    if (a.isCurrentActive && !b.isCurrentActive) return -1;
+    if (!a.isCurrentActive && b.isCurrentActive) return 1;
+    return 0;
+  });
+
+  const displayed = sorted.slice(0, 2);
+  const remainingCount = sorted.length - displayed.length;
+
+  const getInitials = (name: string) => {
+    if (!name) return "";
+    const parts = name.trim().split(/\s+/);
+    if (parts.length >= 2) {
+      return (parts[0][0] + parts[1][0]).toUpperCase();
+    }
+    return name.substring(0, 2).toUpperCase();
+  };
+
+  return (
+    <div className="flex items-center -space-x-1.5 overflow-hidden select-none">
+      {displayed.map((c) => {
+        const initials = getInitials(c.name);
+        return (
+          <div
+            key={c.developerId}
+            title={`${c.name} (${c.role})${c.isCurrentActive ? ' - Active' : ''} - Progress: ${c.individualProgress}%`}
+            className={`w-5 h-5 rounded-full flex items-center justify-center text-[9px] font-black text-white border shadow-sm ${
+              c.isCurrentActive 
+                ? "bg-blue-600 border-blue-200" 
+                : "bg-slate-400 border-white"
+            }`}
+          >
+            {initials}
+          </div>
+        );
+      })}
+      {remainingCount > 0 && (
+        <div
+          title={`+${remainingCount} other contributors`}
+          className="w-5 h-5 rounded-full bg-slate-200 border border-white flex items-center justify-center text-[8px] font-black text-slate-650"
+        >
+          +{remainingCount}
+        </div>
+      )}
+    </div>
+  );
+};
 
 export function KanbanBoard({ tasks, onEdit, onPreview, onRefresh }: KanbanBoardProps) {
   const [updatingId, setUpdatingId] = useState<string | null>(null);
@@ -265,6 +325,21 @@ export function KanbanBoard({ tasks, onEdit, onPreview, onRefresh }: KanbanBoard
                             <span className="text-[9px] font-extrabold text-blue-700 uppercase bg-blue-50 px-1.5 py-0.5 rounded border border-blue-100/30">
                               {task.epic || "-"}
                             </span>
+                            {task.screenshotUrl ? (
+                              <span 
+                                title="Has screenshot references" 
+                                className="inline-flex items-center justify-center p-0.5 rounded bg-emerald-50 text-emerald-600 border border-emerald-200/30"
+                              >
+                                <Image className="w-3.5 h-3.5" />
+                              </span>
+                            ) : (
+                              <span 
+                                title="Missing screenshot reference" 
+                                className="inline-flex items-center justify-center p-0.5 rounded bg-slate-50 text-slate-400 border border-slate-200/30"
+                              >
+                                <Image className="w-3.5 h-3.5 opacity-40" />
+                              </span>
+                            )}
                           </div>
                           <Badge 
                             variant="outline"
@@ -310,13 +385,14 @@ export function KanbanBoard({ tasks, onEdit, onPreview, onRefresh }: KanbanBoard
 
                         {/* Compact Footer Actions */}
                         <div className="flex items-center justify-between pt-1 border-t border-slate-50">
-                          {task.feature ? (
-                            <span className="text-[10px] text-slate-400 truncate max-w-[130px] font-medium" title={task.feature}>
-                              {task.feature}
-                            </span>
-                          ) : (
-                            <span />
-                          )}
+                          <div className="flex items-center gap-1.5 overflow-hidden max-w-[150px]">
+                            {task.feature && (
+                              <span className="text-[10px] text-slate-450 truncate max-w-[80px] font-medium" title={task.feature}>
+                                {task.feature}
+                              </span>
+                            )}
+                            {renderAvatars(task.contributors)}
+                          </div>
                           
                           <div className="flex items-center gap-0.5 opacity-60 group-hover:opacity-100 transition-opacity">
                             <Button 

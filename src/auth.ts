@@ -99,6 +99,7 @@ export const authOptions: NextAuthOptions = {
   },
   session: {
     strategy: "jwt",
+    maxAge: 8 * 60 * 60, // 8 hours — limits stale-token window after role changes
   },
   callbacks: {
     async jwt({ token, user, trigger, session }) {

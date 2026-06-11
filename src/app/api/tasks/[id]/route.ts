@@ -2,9 +2,10 @@ import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/auth";
 import { db } from "@/db";
-import { tasks, projectMembers } from "@/db/schema";
+import { tasks, projectMembers, taskContributors, users, notifications } from "@/db/schema";
 import { eq, and } from "drizzle-orm";
 import { z } from "zod";
+import { randomUUID } from "crypto";
 
 const taskUpdateSchema = z.object({
   title: z.string().min(1).optional(),
@@ -37,7 +38,27 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
   const { id } = await params;
   const task = await db.select().from(tasks).where(and(eq(tasks.id, id), eq(tasks.projectId, session.user.projectId))).limit(1);
   if (task.length === 0) return NextResponse.json({ error: "Not found" }, { status: 404 });
-  return NextResponse.json(task[0]);
+  
+  // Fetch contributors
+  const contributors = await db
+    .select({
+      id: taskContributors.id,
+      taskId: taskContributors.taskId,
+      developerId: taskContributors.developerId,
+      individualProgress: taskContributors.individualProgress,
+      isCurrentActive: taskContributors.isCurrentActive,
+      name: users.name,
+      email: users.email,
+      role: users.role,
+    })
+    .from(taskContributors)
+    .innerJoin(users, eq(taskContributors.developerId, users.id))
+    .where(eq(taskContributors.taskId, id));
+
+  return NextResponse.json({
+    ...task[0],
+    contributors,
+  });
 }
 
 export async function PUT(request: Request, { params }: { params: Promise<{ id: string }> }) {
@@ -104,6 +125,9 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
     }
   }
 
+  const oldAssigneeId = existing[0].assigneeId;
+  const newAssigneeId = validatedData.assigneeId;
+
   const updated = await db
     .update(tasks)
     .set({
@@ -132,6 +156,97 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
     })
     .where(and(eq(tasks.id, id), eq(tasks.projectId, session.user.projectId)))
     .returning();
+
+  if (newAssigneeId !== undefined && newAssigneeId !== oldAssigneeId && newAssigneeId !== null && newAssigneeId !== session.user.id) {
+    const senderName = session.user.name || "Seseorang";
+    try {
+      await db.insert(notifications).values({
+        id: randomUUID(),
+        recipientId: newAssigneeId,
+        senderId: session.user.id,
+        taskId: id,
+        title: "Perubahan Penugasan Tugas",
+        message: `${senderName} menugaskan tugas "${updated[0].title}" kepada Anda.`,
+        isRead: false,
+      });
+    } catch (err) {
+      console.error("Failed to create task reassignment notification:", err);
+    }
+  }
+
+  // 1. QA Feedback Loop
+  const oldStatus = existing[0].status as string;
+  const newStatus = validatedData.status as string | undefined;
+  if (newStatus !== undefined && newStatus !== oldStatus) {
+    if (newStatus === "review") {
+      try {
+        const qas = await db
+          .select()
+          .from(projectMembers)
+          .where(and(eq(projectMembers.projectId, session.user.projectId), eq(projectMembers.role, "qa")));
+        if (qas.length > 0) {
+          const senderName = session.user.name || "Seseorang";
+          const qaNotifs = qas.map((q) => ({
+            id: randomUUID(),
+            recipientId: q.userId,
+            senderId: session.user.id,
+            taskId: id,
+            title: "Tugas Siap Di-review",
+            message: `${senderName} mengajukan tugas "${updated[0].title}" ke kolom review.`,
+            isRead: false,
+          }));
+          await db.insert(notifications).values(qaNotifs);
+        }
+      } catch (err) {
+        console.error("Failed to send QA review notifications:", err);
+      }
+    } else if (oldStatus === "review" && newStatus !== "review" && newStatus !== "done") {
+      if (updated[0].assigneeId && updated[0].assigneeId !== session.user.id) {
+        const senderName = session.user.name || "Seseorang";
+        const statusLabels: Record<string, string> = {
+          todo: "To Do",
+          in_progress: "In Progress",
+        };
+        const targetStatus = statusLabels[newStatus] || newStatus;
+        try {
+          await db.insert(notifications).values({
+            id: randomUUID(),
+            recipientId: updated[0].assigneeId,
+            senderId: session.user.id,
+            taskId: id,
+            title: "Tugas Dikembalikan / Gagal QA",
+            message: `${senderName} mengembalikan tugas "${updated[0].title}" ke status ${targetStatus}.`,
+            isRead: false,
+          });
+        } catch (err) {
+          console.error("Failed to send QA rejection notification:", err);
+        }
+      }
+    }
+  }
+
+  // 2. Blocker Cleared
+  const oldBlocker = existing[0].blocker;
+  const newBlocker = validatedData.blocker;
+  const isBlockerCleared = oldBlocker && (newBlocker === null || newBlocker === "");
+  if (isBlockerCleared) {
+    if (updated[0].assigneeId && updated[0].assigneeId !== session.user.id) {
+      const senderName = session.user.name || "Seseorang";
+      try {
+        await db.insert(notifications).values({
+          id: randomUUID(),
+          recipientId: updated[0].assigneeId,
+          senderId: session.user.id,
+          taskId: id,
+          title: "Hambatan Diselesaikan (Blocker Cleared)",
+          message: `${senderName} telah menghapus hambatan pada tugas "${updated[0].title}". Anda dapat melanjutkan pekerjaan.`,
+          isRead: false,
+        });
+      } catch (err) {
+        console.error("Failed to send blocker cleared notification:", err);
+      }
+    }
+  }
 
   return NextResponse.json(updated[0]);
 }

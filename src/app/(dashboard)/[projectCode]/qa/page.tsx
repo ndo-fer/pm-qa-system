@@ -100,36 +100,19 @@ const moduleToEpicMap: Record<string, string> = {
   "Kinerja": "RPT",
 };
 
-const getCredentialsForRole = (role: string): string => {
-  const credentials: Record<string, unknown> = {
-    administrator: {
-      type: "single",
-      username: "PDJService",
-      password: "pdj123",
-      role: "administrator"
-    },
-    top_user: {
-      type: "single",
-      username: "K009",
-      password: "123456",
-      role: "top_user"
-    },
-    user: {
-      type: "single",
-      username: "K010",
-      password: "12345",
-      role: "user"
-    },
-    matrix: {
-      type: "matrix",
-      scenarios: [
-        { role: "administrator", username: "PDJService", password: "pdj123" },
-        { role: "top_user", username: "K009", password: "123456" },
-        { role: "user", username: "K010", password: "12345" }
-      ]
-    }
-  };
-  return JSON.stringify(credentials[role] || credentials.matrix, null, 2);
+/**
+ * Fetches ERP role credentials from the secure server-side endpoint.
+ * Credentials are NEVER stored in client-side code.
+ */
+const fetchCredentialsForRole = async (role: string): Promise<string> => {
+  try {
+    const res = await fetch(`/api/qa/credentials?role=${encodeURIComponent(role)}`);
+    if (!res.ok) return "";
+    const data = await res.json();
+    return JSON.stringify(data, null, 2);
+  } catch {
+    return "";
+  }
 };
 
 export default function QAPage() {
@@ -212,6 +195,12 @@ export default function QAPage() {
   const [syncing, setSyncing] = useState(false);
   const [lastSyncedAt, setLastSyncedAt] = useState<string | null>(null);
 
+  // Playwright E2E runner state
+  const [e2eLogs, setE2eLogs] = useState<string[]>([]);
+  const [e2eRunning, setE2eRunning] = useState(false);
+  const [e2eScreenshot, setE2eScreenshot] = useState<string | null>(null);
+  const [e2eEventSource, setE2eEventSource] = useState<EventSource | null>(null);
+
   const fetchData = useCallback(async () => {
     setLoading(true);
     try {
@@ -269,7 +258,9 @@ export default function QAPage() {
 
   useEffect(() => {
     if (newCaseErpRole && !newCaseLoginCreds) {
-      setNewCaseLoginCreds(getCredentialsForRole(newCaseErpRole));
+      fetchCredentialsForRole(newCaseErpRole).then(creds => {
+        if (creds) setNewCaseLoginCreds(creds);
+      });
     }
   }, [newCaseErpRole, newCaseLoginCreds]);
 
@@ -448,6 +439,43 @@ export default function QAPage() {
     }
   }
 
+  const stopPlaywrightE2ETest = useCallback(() => {
+    if (e2eEventSource) {
+      e2eEventSource.close();
+    }
+    setE2eRunning(false);
+    setE2eLogs((prev) => [...prev, "■ Execution aborted by user."]);
+  }, [e2eEventSource]);
+
+  const runPlaywrightE2ETest = () => {
+    setE2eRunning(true);
+    setE2eLogs([]);
+    setE2eScreenshot(null);
+
+    const eventSource = new EventSource("/api/test-cases/run-stream");
+    setE2eEventSource(eventSource);
+
+    eventSource.addEventListener("log", (event) => {
+      setE2eLogs((prev) => [...prev, event.data]);
+    });
+
+    eventSource.addEventListener("screenshot", (event) => {
+      const screenshotPath = event.data;
+      setE2eScreenshot(screenshotPath);
+      setExecAttachmentUrl(screenshotPath);
+      setExecStatus("fail");
+      setExecActualResult(`Skenario pengujian E2E gagal. Screenshot kegagalan: ${screenshotPath}`);
+      if (userRole === "qa" || userRole === "admin" || userRole === "pm") {
+        setCreateDefect(true);
+      }
+    });
+
+    eventSource.onerror = () => {
+      eventSource.close();
+      setE2eRunning(false);
+    };
+  };
+
   // Pre-fill execution modal values when active test case changes
   const startExecution = (tc: TestCase) => {
     setActiveExecCase(tc);
@@ -459,6 +487,15 @@ export default function QAPage() {
     setCheckedSteps({});
     setTestError(null);
     setTestSuccess(null);
+    
+    // Clear E2E states
+    setE2eLogs([]);
+    setE2eRunning(false);
+    setE2eScreenshot(null);
+    if (e2eEventSource) {
+      e2eEventSource.close();
+      setE2eEventSource(null);
+    }
   };
 
   const getApiEndpointForCase = (caseNumber: string, description: string): string | null => {
@@ -1233,12 +1270,7 @@ export default function QAPage() {
               <textarea
                 value={newCaseLoginCreds}
                 onChange={(e) => setNewCaseLoginCreds(e.target.value)}
-                placeholder={`{
-  "type": "single",
-  "username": "PDJService",
-  "password": "pdj123",
-  "role": "administrator"
-}`}
+                placeholder={`{\n  "type": "single",\n  "username": "...",\n  "password": "...",\n  "role": "administrator"\n}`}
                 className="w-full h-20 border border-input rounded-lg p-2.5 text-xs font-mono focus:ring-blue-500 focus:border-blue-500 outline-none"
               />
             </div>
@@ -1480,6 +1512,81 @@ export default function QAPage() {
                     )}
                   </div>
                 )}
+
+                {/* Real-time Playwright E2E Test Suite Runner */}
+                <div className="bg-white rounded-xl border border-slate-150 p-5 shadow-sm space-y-4">
+                  <div className="flex items-center justify-between border-b pb-2 border-slate-100">
+                    <div className="flex items-center gap-1.5">
+                      <Play className="w-4 h-4 text-purple-600" />
+                      <h4 className="text-xs font-bold text-slate-800">Playwright E2E Test Runner</h4>
+                    </div>
+                    {e2eRunning && (
+                      <Badge className="bg-purple-100 text-purple-750 border-none font-bold text-[9px] animate-pulse">
+                        Running E2E...
+                      </Badge>
+                    )}
+                  </div>
+
+                  <p className="text-[11px] text-slate-555 leading-normal font-medium">
+                    Menjalankan skenario pengujian E2E Playwright secara langsung pada server lokal Headless Browser. Log output akan ditampilkan secara real-time di bawah.
+                  </p>
+
+                  <div className="flex items-center gap-2">
+                    <Button
+                      type="button"
+                      size="sm"
+                      disabled={e2eRunning}
+                      onClick={runPlaywrightE2ETest}
+                      className="h-7 text-[11px] font-bold text-white bg-purple-600 hover:bg-purple-700"
+                    >
+                      {e2eRunning ? "Running..." : "🚀 Run Playwright E2E Suite"}
+                    </Button>
+                    {e2eRunning && (
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="outline"
+                        onClick={stopPlaywrightE2ETest}
+                        className="h-7 text-[11px] font-bold text-red-650 hover:bg-red-50 border-red-200"
+                      >
+                        Stop Test
+                      </Button>
+                    )}
+                  </div>
+
+                  {/* Real-time Console Log Box */}
+                  {(e2eLogs.length > 0 || e2eRunning) && (
+                    <div className="space-y-1.5">
+                      <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wide flex justify-between">
+                        <span>Console Output</span>
+                        <span className="text-[9px] font-normal text-slate-400 capitalize">Real-time Stream</span>
+                      </label>
+                      <div className="bg-slate-950 text-slate-200 p-3 rounded-lg border border-slate-900 font-mono text-[10px] h-48 overflow-y-auto space-y-1 select-text">
+                        {e2eLogs.map((log, index) => (
+                          <div key={index} className={log.startsWith("[ERROR]") ? "text-rose-400 font-bold" : log.includes("✓") || log.includes("successful") || log.includes("passed") ? "text-emerald-400" : "text-slate-300"}>
+                            {log}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Failure screenshot preview */}
+                  {e2eScreenshot && (
+                    <div className="space-y-2 border border-red-150 p-3 rounded-lg bg-red-50/20">
+                      <span className="text-[10px] font-black uppercase tracking-wider text-red-900 flex items-center gap-1">
+                        <AlertTriangle className="w-3.5 h-3.5 text-red-600 animate-bounce" />
+                        E2E Failure Artifact Captured
+                      </span>
+                      <p className="text-[11px] text-red-800 leading-normal">
+                        Langkah terakhir dari skenario pengujian gagal. Screenshot kegagalan telah disimpan sebagai dokumentasi bug.
+                      </p>
+                      <div className="border border-red-150 rounded-lg overflow-hidden bg-white max-w-sm">
+                        <img src={e2eScreenshot} alt="E2E Failure screenshot" className="w-full h-auto object-contain" />
+                      </div>
+                    </div>
+                  )}
+                </div>
               </div>
 
               {/* Right Column (Select Outcome, Actual Result, Notes) - 2/5 width */}

@@ -3,7 +3,7 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { useSession } from "next-auth/react";
-import { useParams } from "next/navigation";
+import { useParams, useSearchParams } from "next/navigation";
 import { AppLayout } from "@/components/layout/app-layout";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -32,7 +32,7 @@ import {
 } from "@/components/ui/dialog";
 import { KanbanBoard } from "@/components/tasks/kanban-board";
 import { TaskPreviewModal } from "@/components/tasks/task-preview-modal";
-import { Plus, Pencil, Trash2, LayoutGrid, List, RefreshCw, HardDrive, Archive } from "lucide-react";
+import { Plus, Pencil, Trash2, LayoutGrid, List, RefreshCw, HardDrive, Archive, Image } from "lucide-react";
 import { ExportButton } from "@/components/ui/export-button";
 import { Input } from "@/components/ui/input";
 
@@ -124,6 +124,7 @@ export default function TasksPage() {
   const { data: session } = useSession();
   const params = useParams();
   const projectCode = params?.projectCode as string;
+  const searchParams = useSearchParams();
 
   const [tasks, setTasks] = useState<Task[]>([]);
   const [projects, setProjects] = useState<Project[]>([]);
@@ -140,6 +141,7 @@ export default function TasksPage() {
   const [filterStatus, setFilterStatus] = useState("");
   const [filterPriority, setFilterPriority] = useState("");
   const [filterEpic, setFilterEpic] = useState("");
+  const [filterScreenshot, setFilterScreenshot] = useState("all");
 
   const [addModuleOpen, setAddModuleOpen] = useState(false);
   const [newModuleName, setNewModuleName] = useState("");
@@ -281,6 +283,23 @@ export default function TasksPage() {
     fetchData();
   }, [fetchData]);
 
+  useEffect(() => {
+    if (tasks.length > 0) {
+      const taskIdParam = searchParams.get("taskId");
+      if (taskIdParam) {
+        const taskToPreview = tasks.find((t) => t.id === taskIdParam);
+        if (taskToPreview) {
+          setPreviewTask(taskToPreview);
+          setPreviewOpen(true);
+          
+          // Clear query parameter from the URL to prevent reopening on reload
+          const cleanUrl = window.location.pathname;
+          window.history.replaceState({ path: cleanUrl }, "", cleanUrl);
+        }
+      }
+    }
+  }, [searchParams, tasks]);
+
   // Database data is fetched scoping to the selected project
   async function handleDelete(id: string) {
     if (!confirm("Delete this task?")) return;
@@ -311,6 +330,8 @@ export default function TasksPage() {
     if (filterStatus && t.status !== filterStatus) return false;
     if (filterPriority && t.priority !== filterPriority) return false;
     if (filterEpic && t.epic !== filterEpic) return false;
+    if (filterScreenshot === "yes" && !t.screenshotUrl) return false;
+    if (filterScreenshot === "no" && t.screenshotUrl) return false;
     if (filterPhase && t.phase !== filterPhase) return false;
     if (filterErpRole && t.erpRole !== filterErpRole) return false;
     if (filterAssignee) {
@@ -619,7 +640,20 @@ export default function TasksPage() {
               ))}
             </SelectContent>
           </Select>
-          {(filterEpic || filterPhase || filterStatus || filterPriority || filterAssignee || searchQuery) && (
+          <Select value={filterScreenshot} onValueChange={(val) => setFilterScreenshot(val || "all")}>
+            <SelectTrigger className="w-44 h-8 text-xs px-2.5">
+              <span className="text-slate-500 font-semibold mr-1">Screenshot:</span>
+              <span data-slot="select-value" className="text-left font-medium">
+                {filterScreenshot === "yes" ? "Has Screenshot" : filterScreenshot === "no" ? "Missing Screenshot" : "All"}
+              </span>
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All</SelectItem>
+              <SelectItem value="yes">Has Screenshot</SelectItem>
+              <SelectItem value="no">Missing Screenshot</SelectItem>
+            </SelectContent>
+          </Select>
+          {(filterEpic || filterPhase || filterStatus || filterPriority || filterAssignee || searchQuery || filterScreenshot !== "all") && (
             <Button
               variant="outline"
               className="h-8 text-xs border-dashed px-2.5 text-red-600 border-red-200 hover:bg-red-50 hover:text-red-700"
@@ -630,6 +664,7 @@ export default function TasksPage() {
                 setFilterPriority("");
                 setFilterAssignee("");
                 setSearchQuery("");
+                setFilterScreenshot("all");
               }}
             >
               Clear Filters ×
@@ -680,7 +715,26 @@ export default function TasksPage() {
                           setPreviewOpen(true);
                         }}
                       >
-                        <TableCell className="font-mono text-xs font-semibold text-slate-500">{task.taskCode || "-"}</TableCell>
+                        <TableCell className="font-mono text-xs font-semibold text-slate-500">
+                          <div className="flex items-center gap-1.5">
+                            <span>{task.taskCode || "-"}</span>
+                            {task.screenshotUrl ? (
+                              <span 
+                                title="Has screenshot references" 
+                                className="inline-flex items-center justify-center p-0.5 rounded bg-emerald-50 text-emerald-600 border border-emerald-200/30"
+                              >
+                                <Image className="w-3.5 h-3.5" />
+                              </span>
+                            ) : (
+                              <span 
+                                title="Missing screenshot reference" 
+                                className="inline-flex items-center justify-center p-0.5 rounded bg-slate-50 text-slate-400 border border-slate-200/30"
+                              >
+                                <Image className="w-3.5 h-3.5 opacity-40" />
+                              </span>
+                            )}
+                          </div>
+                        </TableCell>
                         <TableCell><Badge variant="secondary" className="font-semibold">{task.epic || "-"}</Badge></TableCell>
                         <TableCell>
                           <div className="max-w-md">
@@ -757,6 +811,7 @@ export default function TasksPage() {
           setEditingTask(task);
           setFormOpen(true);
         }}
+        onRefresh={fetchData}
       />
 
       <Dialog open={addModuleOpen} onOpenChange={setAddModuleOpen}>

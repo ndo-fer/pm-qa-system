@@ -262,7 +262,7 @@ export default async function DashboardPage({ params }: { params: Promise<{ proj
                 <div className="flex justify-between text-sm">
                   <span>Pass Rate</span>
                   <span className="font-medium">
-                    {stats.totalQA > 0 ? Math.round((stats.passedQA / stats.totalQA) * 100) : 0}%
+                    {totalExecutedQA > 0 ? Math.round((stats.passedQA / totalExecutedQA) * 100) : 0}%
                   </span>
                 </div>
               </div>

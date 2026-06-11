@@ -6,6 +6,33 @@ import { testCases, NewTestCase, testPlans, projectMembers, projects } from "@/d
 import { eq, and } from "drizzle-orm";
 import { randomUUID } from "crypto";
 import { authorizeProjectRole } from "@/lib/auth-helpers";
+import { z } from "zod";
+
+const createCaseSchema = z.object({
+  testPlanId: z.string().min(1, "testPlanId is required"),
+  caseNumber: z.string().min(1, "Case number is required").max(50),
+  description: z.string().min(1, "Description is required").max(1000),
+  steps: z.string().nullable().optional(),
+  expectedResult: z.string().nullable().optional(),
+  status: z.enum(["pending", "pass", "fail", "blocked"]).default("pending"),
+  erpRole: z.enum(["administrator", "top_user", "user", "matrix"]).nullable().optional(),
+  testType: z.enum(["functional", "permission", "workflow", "matrix"]).default("functional"),
+  loginCredentials: z.unknown().nullable().optional(),
+  attachmentUrl: z.string().url().nullable().optional(),
+});
+
+const updateCaseSchema = z.object({
+  id: z.string().min(1, "id is required"),
+  status: z.enum(["pending", "pass", "fail", "blocked"]).optional(),
+  actualResult: z.string().nullable().optional(),
+  notes: z.string().nullable().optional(),
+  executedBy: z.string().nullable().optional(),
+  executedAt: z.string().nullable().optional(),
+  erpRole: z.enum(["administrator", "top_user", "user", "matrix"]).nullable().optional(),
+  testType: z.enum(["functional", "permission", "workflow", "matrix"]).optional(),
+  loginCredentials: z.unknown().nullable().optional(),
+  attachmentUrl: z.string().nullable().optional(),
+});
 
 export async function GET(request: Request) {
   const session = await getServerSession(authOptions);
@@ -70,8 +97,23 @@ export async function POST(request: Request) {
   const session = await getServerSession(authOptions);
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-  const body = await request.json();
-  
+  let rawBody: unknown;
+  try {
+    rawBody = await request.json();
+  } catch {
+    return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
+  }
+
+  const validation = createCaseSchema.safeParse(rawBody);
+  if (!validation.success) {
+    return NextResponse.json(
+      { error: "Validation failed", details: validation.error.flatten() },
+      { status: 400 }
+    );
+  }
+
+  const body = validation.data;
+
   // Verify ownership of the test plan
   const plan = await db
     .select()
@@ -90,13 +132,13 @@ export async function POST(request: Request) {
     testPlanId: body.testPlanId,
     caseNumber: body.caseNumber,
     description: body.description,
-    steps: body.steps || null,
-    expectedResult: body.expectedResult || null,
-    status: body.status || "pending",
-    erpRole: body.erpRole || null,
-    testType: body.testType || "functional",
-    loginCredentials: body.loginCredentials || null,
-    attachmentUrl: body.attachmentUrl || null,
+    steps: body.steps ?? null,
+    expectedResult: body.expectedResult ?? null,
+    status: body.status,
+    erpRole: body.erpRole ?? null,
+    testType: body.testType,
+    loginCredentials: body.loginCredentials ?? null,
+    attachmentUrl: body.attachmentUrl ?? null,
   };
 
   const [created] = await db.insert(testCases).values(newCase).returning();
@@ -107,8 +149,22 @@ export async function PUT(request: Request) {
   const session = await getServerSession(authOptions);
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-  const body = await request.json();
-  if (!body.id) return NextResponse.json({ error: "ID required" }, { status: 400 });
+  let rawBody: unknown;
+  try {
+    rawBody = await request.json();
+  } catch {
+    return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
+  }
+
+  const validation = updateCaseSchema.safeParse(rawBody);
+  if (!validation.success) {
+    return NextResponse.json(
+      { error: "Validation failed", details: validation.error.flatten() },
+      { status: 400 }
+    );
+  }
+
+  const body = validation.data;
 
   const existingResult = await db
     .select({

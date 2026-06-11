@@ -6,6 +6,17 @@ import { testPlans, NewTestPlan, projects } from "@/db/schema";
 import { eq, desc } from "drizzle-orm";
 import { randomUUID } from "crypto";
 import { authorizeProjectRole } from "@/lib/auth-helpers";
+import { z } from "zod";
+
+const QA_MODULES = ["Pemasok", "Pelanggan", "Barang", "Katalog Lain", "Pengaturan", "Keuangan", "Kinerja"] as const;
+
+const createPlanSchema = z.object({
+  name: z.string().min(1, "Plan name is required").max(255),
+  module: z.enum(QA_MODULES, { error: "Invalid module" }),
+  projectCode: z.string().optional(),
+  projectId: z.string().optional(),
+  status: z.enum(["draft", "active", "completed"]).default("draft"),
+});
 
 export async function GET(request: Request) {
   const session = await getServerSession(authOptions);
@@ -42,7 +53,22 @@ export async function POST(request: Request) {
   const session = await getServerSession(authOptions);
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-  const body = await request.json();
+  let rawBody: unknown;
+  try {
+    rawBody = await request.json();
+  } catch {
+    return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
+  }
+
+  const validation = createPlanSchema.safeParse(rawBody);
+  if (!validation.success) {
+    return NextResponse.json(
+      { error: "Validation failed", details: validation.error.flatten() },
+      { status: 400 }
+    );
+  }
+
+  const body = validation.data;
   let targetProjectId = body.projectId || session.user.projectId;
   if (body.projectCode) {
     const project = await db.select().from(projects).where(eq(projects.code, body.projectCode)).limit(1);
@@ -60,7 +86,7 @@ export async function POST(request: Request) {
     projectId: targetProjectId,
     name: body.name,
     module: body.module,
-    status: body.status || "draft",
+    status: body.status,
   };
 
   const [created] = await db.insert(testPlans).values(newPlan).returning();

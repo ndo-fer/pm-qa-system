@@ -14,18 +14,18 @@ async function seed() {
   const erpUserPassword = await bcrypt.hash("12345", 10);
 
   const defaultUsers = [
-    { id: randomUUID(), name: "Admin", email: "admin@erp.local", passwordHash: adminPassword, role: "admin" },
-    { id: randomUUID(), name: "Project Manager", email: "pm@erp.local", passwordHash: pmPassword, role: "pm" },
-    { id: randomUUID(), name: "QA Tester", email: "qa@erp.local", passwordHash: qaPassword, role: "qa" },
-    { id: randomUUID(), name: "Developer", email: "dev@erp.local", passwordHash: devPassword, role: "developer" },
-    { id: randomUUID(), name: "ERP Administrator", email: "PDJService@erp.local", passwordHash: erpAdminPassword, role: "admin" },
-    { id: randomUUID(), name: "ERP Top User", email: "K009@erp.local", passwordHash: erpTopUserPassword, role: "qa" },
-    { id: randomUUID(), name: "ERP User", email: "K010@erp.local", passwordHash: erpUserPassword, role: "qa" },
+    { id: randomUUID(), name: "Admin", email: "admin@erp.local", passwordHash: adminPassword, role: "admin", phone: process.env.WA_PHONE_ADMIN || "+6281234567897" },
+    { id: randomUUID(), name: "Project Manager", email: "pm@erp.local", passwordHash: pmPassword, role: "pm", phone: process.env.WA_PHONE_PM || "+6281234567895" },
+    { id: randomUUID(), name: "QA Tester", email: "qa@erp.local", passwordHash: qaPassword, role: "qa", phone: process.env.WA_PHONE_QA || "+6281234567896" },
+    { id: randomUUID(), name: "Developer", email: "dev@erp.local", passwordHash: devPassword, role: "developer", phone: process.env.WA_PHONE_DEV || "+6281234567890" },
+    { id: randomUUID(), name: "ERP Administrator", email: "PDJService@erp.local", passwordHash: erpAdminPassword, role: "admin", phone: null },
+    { id: randomUUID(), name: "ERP Top User", email: "K009@erp.local", passwordHash: erpTopUserPassword, role: "qa", phone: null },
+    { id: randomUUID(), name: "ERP User", email: "K010@erp.local", passwordHash: erpUserPassword, role: "qa", phone: null },
     // New Team Members
-    { id: randomUUID(), name: "Affan", email: "affan@erp.local", passwordHash: devPassword, role: "developer" },
-    { id: randomUUID(), name: "Rifqi", email: "rifqi@erp.local", passwordHash: devPassword, role: "developer" },
-    { id: randomUUID(), name: "Halim", email: "halim@erp.local", passwordHash: devPassword, role: "developer" },
-    { id: randomUUID(), name: "Akbar", email: "akbar@erp.local", passwordHash: devPassword, role: "developer" },
+    { id: randomUUID(), name: "Affan", email: "affan@erp.local", passwordHash: devPassword, role: "developer", phone: process.env.WA_PHONE_AFFAN || "6285177431505" },
+    { id: randomUUID(), name: "Rifqi", email: "rifqi@erp.local", passwordHash: devPassword, role: "developer", phone: process.env.WA_PHONE_RIFQI || "0895704940400" },
+    { id: randomUUID(), name: "Halim", email: "halim@erp.local", passwordHash: devPassword, role: "developer", phone: process.env.WA_PHONE_HALIM || "+6281234567893" },
+    { id: randomUUID(), name: "Akbar", email: "akbar@erp.local", passwordHash: devPassword, role: "developer", phone: process.env.WA_PHONE_AKBAR || "+6281234567894" },
   ];
 
   for (const user of defaultUsers) {
@@ -34,7 +34,8 @@ async function seed() {
       await db.insert(users).values(user);
       console.log(`✓ Created user: ${user.email}`);
     } else {
-      console.log(`- User already exists: ${user.email}`);
+      await db.update(users).set({ phone: user.phone }).where(eq(users.id, existing[0].id));
+      console.log(`✓ Updated phone for existing user: ${user.email}`);
     }
   }
 

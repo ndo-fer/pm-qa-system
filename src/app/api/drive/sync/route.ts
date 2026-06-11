@@ -4,7 +4,7 @@ import { db } from "@/db";
 import { tasks } from "@/db/schema";
 import { eq } from "drizzle-orm";
 
-const DRIVE_FOLDER_ID = "1S47Yw3hNVh0hQZfEw1Gr1YvoAtxL9mit";
+const DRIVE_FOLDER_ID = process.env.GOOGLE_DRIVE_FOLDER_ID || "1S47Yw3hNVh0hQZfEw1Gr1YvoAtxL9mit";
 
 // ─── Auth ────────────────────────────────────────────────────────────────────
 
@@ -39,6 +39,37 @@ async function getClients() {
 }
 
 // ─── Text normalisation helpers (ported from Apps Script) ─────────────────────
+
+function collapseDuplicates(text: string): string {
+  return text.replace(/([a-zA-Z])\1+/g, "$1");
+}
+
+function standardizeText(text: string): string {
+  const norm = (text || "").toLowerCase()
+    .replace(/[_\-\.\+]/g, " ")   // separators → spaces
+    .replace(/[^a-z0-9\s]/g, "") // strip non-alphanumeric
+    .replace(/\s+/g, " ")
+    .trim();
+  
+  // Collapse duplicate letters to handle typos (e.g. overlimiit -> overlimit)
+  const collapsed = collapseDuplicates(norm);
+  
+  // Standardize common terms & abbreviations
+  return collapsed
+    .replace(/\brupiah\b/g, "rp")
+    .replace(/\bkirim\b/g, "krm")
+    .replace(/\bpengiriman\b/g, "krm")
+    .replace(/\bpembelian\b/g, "pur")
+    .replace(/\bpersediaan\b/g, "inv")
+    .replace(/\blaporan\b/g, "rpt")
+    .replace(/\breport\b/g, "rpt")
+    .replace(/\btransaksi\b/g, "trx")
+    .replace(/\bmaster\b/g, "mst")
+    .replace(/\bpiutang\b/g, "ar")
+    .replace(/\bhutang\b/g, "ap")
+    .replace(/\bfinance\b/g, "fin")
+    .replace(/\bgl\b/g, "general ledger");
+}
 
 function normalizeText(text: string): string {
   return (text || "")
@@ -107,17 +138,17 @@ async function collectImageFilesRecursive(
 function buildSearchTokens(kodeUi: string, namaTampilan: string): string[] {
   const STOP_WORDS = new Set([
     "old", "mst", "trx", "rpt", "pur", "sls", "prd", "inv", "fin", "sys",
-    "data", "dan", "yang", "untuk", "dengan", "form", "master",
+    "data", "dan", "yang", "untuk", "dengan", "form", "master", "hasil",
   ]);
-  const text = normalizeText(`${kodeUi} ${namaTampilan}`);
+  const text = standardizeText(`${kodeUi} ${namaTampilan}`);
   return text
     .split(" ")
-    .filter((t) => t.length >= 3 && !STOP_WORDS.has(t));
+    .filter((t) => t.length >= 2 && !STOP_WORDS.has(t)); // allow >= 2 length for rp, ap, ar, gl
 }
 
-function scoreTokenOverlap(tokens: string[], normalizedFileName: string): number {
+function scoreTokenOverlap(tokens: string[], standardizedFileName: string): number {
   if (!tokens.length) return 0;
-  const hits = tokens.filter((t) => normalizedFileName.includes(t)).length;
+  const hits = tokens.filter((t) => standardizedFileName.includes(t)).length;
   return Math.round((hits / tokens.length) * 45);
 }
 
@@ -149,32 +180,33 @@ function findBestScreenshotMatches(
   namaTampilan: string,
   fileIndex: DriveFile[]
 ): ScoredFile[] {
-  const normalizedKode = normalizeText(kodeUi);
-  const normalizedNama = normalizeText(namaTampilan);
+  const stdKode = standardizeText(kodeUi);
+  const stdNama = standardizeText(namaTampilan);
   const tokens = buildSearchTokens(kodeUi, namaTampilan);
 
   const scored: ScoredFile[] = fileIndex.map((file) => {
     let score = 0;
+    const stdFileName = standardizeText(removeExtension(file.name));
 
     // Exact code match (highest priority)
-    if (normalizedKode && file.normalizedName.includes(normalizedKode)) score += 95;
+    if (stdKode && stdFileName.includes(stdKode)) score += 95;
 
     // Exact name match
-    if (normalizedNama && file.normalizedName === normalizedNama) score += 100;
+    if (stdNama && stdFileName === stdNama) score += 100;
 
     // Partial name match
-    if (normalizedNama && file.normalizedName.includes(normalizedNama)) score += 85;
-    if (normalizedNama && normalizedNama.includes(file.normalizedName)) score += 70;
+    if (stdNama && stdFileName.includes(stdNama)) score += 85;
+    if (stdNama && stdNama.includes(stdFileName)) score += 70;
 
     // Token overlap + suffix hints
-    score += scoreTokenOverlap(tokens, file.normalizedName);
-    score += scoreSuffixHints(kodeUi, file.normalizedName);
+    score += scoreTokenOverlap(tokens, stdFileName);
+    score += scoreSuffixHints(kodeUi, stdFileName);
 
     return { ...file, score };
   });
 
   return scored
-    .filter((item) => item.score >= 35)
+    .filter((item) => item.score >= 25) // Lower threshold to match more cases
     .sort((a, b) => b.score - a.score);
 }
 
@@ -254,7 +286,7 @@ export async function GET() {
     // 2. Read UI Reference sheet to build Kode UI → Task ID mapping
     const uiRefRows = await readUiReference(sheets, spreadsheetId);
 
-    // 3. Build reverse map: taskCode (normalized) → best screenshot embed URL
+        // 3. Build reverse map: taskCode (normalized) → best screenshot embed URL
     //    by running the fuzzy match for each UI Reference entry
     const taskScreenshotMap = new Map<string, string>(); // taskCode → embedUrl
 
@@ -264,8 +296,9 @@ export async function GET() {
       const matches = findBestScreenshotMatches(uiRow.kodeUi, uiRow.namaTampilan, allFiles);
       if (matches.length === 0) continue;
 
-      const best = matches[0];
-      const embedUrl = toStoredUrl(best.id);
+      // Map up to 3 top matching screenshots (separated by semicolon)
+      const topMatches = matches.filter((m, idx) => idx === 0 || m.score >= 45).slice(0, 3);
+      const embedUrl = topMatches.map(m => toStoredUrl(m.id)).join(";");
 
       // Map to each task ID linked to this UI row
       for (const tid of uiRow.taskIds) {
@@ -318,7 +351,8 @@ export async function GET() {
       if (!embedUrl && task.title) {
         const matches = findBestScreenshotMatches("", task.title, allFiles);
         if (matches.length > 0) {
-          embedUrl = toStoredUrl(matches[0].id);
+          const topMatches = matches.filter((m, idx) => idx === 0 || m.score >= 45).slice(0, 3);
+          embedUrl = topMatches.map(m => toStoredUrl(m.id)).join(";");
           directMatched++;
           isMatched = true;
         }

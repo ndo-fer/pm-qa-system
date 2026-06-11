@@ -1,4 +1,4 @@
-import { pgTable, text, integer, timestamp, jsonb } from "drizzle-orm/pg-core";
+import { pgTable, text, integer, timestamp, jsonb, boolean } from "drizzle-orm/pg-core";
 
 export const users = pgTable("users", {
   id: text("id").primaryKey(),
@@ -6,6 +6,7 @@ export const users = pgTable("users", {
   email: text("email").notNull().unique(),
   passwordHash: text("password_hash").notNull(),
   role: text("role").$type<"admin" | "pm" | "developer" | "qa">().notNull(),
+  phone: text("phone"),
   createdAt: timestamp("created_at", { mode: "string" }).defaultNow(),
 });
 
@@ -103,6 +104,36 @@ export const milestones = pgTable("milestones", {
   createdAt: timestamp("created_at", { mode: "string" }).defaultNow(),
 });
 
+export const taskContributors = pgTable("task_contributors", {
+  id: text("id").primaryKey(),
+  taskId: text("task_id").notNull().references(() => tasks.id, { onDelete: "cascade" }),
+  developerId: text("developer_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  individualProgress: integer("individual_progress").default(0).notNull(),
+  isCurrentActive: boolean("is_current_active").default(false).notNull(),
+  joinedAt: timestamp("joined_at", { mode: "string" }).defaultNow(),
+});
+
+export const taskActivities = pgTable("task_activities", {
+  id: text("id").primaryKey(),
+  taskId: text("task_id").notNull().references(() => tasks.id, { onDelete: "cascade" }),
+  triggeredById: text("triggered_by_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  targetUserId: text("target_user_id").references(() => users.id, { onDelete: "cascade" }),
+  activityType: text("activity_type").$type<"assign" | "progress_update" | "blocker_reported" | "handover_notice" | "blocker_notice">().notNull(),
+  note: text("note"),
+  createdAt: timestamp("created_at", { mode: "string" }).defaultNow(),
+});
+
+export const notifications = pgTable("notifications", {
+  id: text("id").primaryKey(),
+  recipientId: text("recipient_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  senderId: text("sender_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  taskId: text("task_id").references(() => tasks.id, { onDelete: "cascade" }),
+  title: text("title").notNull(),
+  message: text("message").notNull(),
+  isRead: boolean("is_read").default(false).notNull(),
+  createdAt: timestamp("created_at", { mode: "string" }).defaultNow(),
+});
+
 export type Milestone = typeof milestones.$inferSelect;
 export type NewMilestone = typeof milestones.$inferInsert;
 
@@ -118,6 +149,12 @@ export type TestCase = typeof testCases.$inferSelect;
 export type NewTestCase = typeof testCases.$inferInsert;
 export type ProjectMember = typeof projectMembers.$inferSelect;
 export type NewProjectMember = typeof projectMembers.$inferInsert;
+export type TaskContributor = typeof taskContributors.$inferSelect;
+export type NewTaskContributor = typeof taskContributors.$inferInsert;
+export type TaskActivity = typeof taskActivities.$inferSelect;
+export type NewTaskActivity = typeof taskActivities.$inferInsert;
+export type Notification = typeof notifications.$inferSelect;
+export type NewNotification = typeof notifications.$inferInsert;
 
 
 // ERP role-based types

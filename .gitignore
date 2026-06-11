@@ -59,3 +59,10 @@ next-env.d.ts
 # Playwright test output
 /playwright-report/
 /test-results/
+
+# WhatsApp Web session cache (contains auth tokens, never commit)
+/.wwebjs_auth/
+/.wwebjs_cache/
+
+# E2E failure screenshots (auto-generated, not source)
+/public/screenshots/
