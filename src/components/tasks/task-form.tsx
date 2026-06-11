@@ -341,8 +341,16 @@ export function TaskForm({ open, onOpenChange, task, projects, users, onSuccess,
 
               {/* Screenshot URL input */}
               <div className="space-y-1.5">
-                <label className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Screenshot URL (Image Link)</label>
-                <Input value={screenshotUrl} onChange={(e) => setScreenshotUrl(e.target.value)} placeholder="https://example.com/image.png" className="h-9 text-sm" />
+                <label className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Screenshot URL (Supports Multiple)</label>
+                <Input 
+                  value={screenshotUrl} 
+                  onChange={(e) => setScreenshotUrl(e.target.value)} 
+                  placeholder="https://example.com/image.png, drive:FILE_ID_2" 
+                  className="h-9 text-sm" 
+                />
+                <p className="text-[10px] text-slate-500 leading-normal">
+                  Masukkan link gambar atau ID Drive. Pisahkan dengan tanda koma (,) untuk menambahkan lebih dari 1 gambar.
+                </p>
               </div>
 
               {/* Screenshot Preview */}

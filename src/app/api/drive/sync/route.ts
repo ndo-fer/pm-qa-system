@@ -292,19 +292,36 @@ export async function GET() {
     let unmatched = 0;
 
     for (const task of allTasks) {
-      if (!task.taskCode) { unmatched++; continue; }
+      let embedUrl: string | null = null;
+      let isMatched = false;
 
-      const normalizedCode = task.taskCode.replace(/_/g, "-").toUpperCase().trim();
+      if (task.taskCode) {
+        const normalizedCode = task.taskCode.replace(/_/g, "-").toUpperCase().trim();
 
-      // Try UI Reference mapping first
-      let embedUrl = taskScreenshotMap.get(normalizedCode) ?? null;
+        // Try UI Reference mapping first
+        embedUrl = taskScreenshotMap.get(normalizedCode) ?? null;
 
-      // Fallback to direct filename match
-      if (!embedUrl) {
-        embedUrl = fileNameMap.get(normalizedCode) ?? null;
-        if (embedUrl) directMatched++;
-      } else {
-        matched++;
+        // Fallback to direct filename match
+        if (!embedUrl) {
+          embedUrl = fileNameMap.get(normalizedCode) ?? null;
+          if (embedUrl) {
+            directMatched++;
+            isMatched = true;
+          }
+        } else {
+          matched++;
+          isMatched = true;
+        }
+      }
+
+      // Fallback: match using task title directly if still not found
+      if (!embedUrl && task.title) {
+        const matches = findBestScreenshotMatches("", task.title, allFiles);
+        if (matches.length > 0) {
+          embedUrl = toStoredUrl(matches[0].id);
+          directMatched++;
+          isMatched = true;
+        }
       }
 
       if (embedUrl !== task.screenshotUrl) {
@@ -312,7 +329,9 @@ export async function GET() {
           .set({ screenshotUrl: embedUrl })
           .where(eq(tasks.id, task.id));
       }
-      if (!embedUrl) unmatched++;
+      if (!isMatched) {
+        unmatched++;
+      }
     }
 
     return NextResponse.json({
