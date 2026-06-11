@@ -3,7 +3,7 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/auth";
 import { db } from "@/db";
 import { taskActivities, users, projectMembers, tasks } from "@/db/schema";
-import { eq, and, desc } from "drizzle-orm";
+import { eq, and, desc, inArray } from "drizzle-orm";
 
 export async function GET(request: Request, { params }: { params: Promise<{ id: string }> }) {
   const session = await getServerSession(authOptions);
@@ -41,13 +41,23 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
       .where(eq(taskActivities.taskId, taskId))
       .orderBy(desc(taskActivities.createdAt));
 
-    // Resolve target user names in-memory for simplicity
-    const allUsers = await db.select({ id: users.id, name: users.name }).from(users);
-    const userMap = new Map(allUsers.map((u) => [u.id, u.name]));
+    // Resolve target user names — scoped to only IDs present in this activity list
+    const targetUserIds = activities
+      .map((a) => a.targetUserId)
+      .filter((id): id is string => !!id);
+
+    const targetUsersResult = targetUserIds.length > 0
+      ? await db
+          .select({ id: users.id, name: users.name })
+          .from(users)
+          .where(inArray(users.id, targetUserIds))
+      : [];
+
+    const userMap = new Map(targetUsersResult.map((u) => [u.id, u.name]));
 
     const enrichedActivities = activities.map((act) => ({
       ...act,
-      targetUserName: act.targetUserId ? userMap.get(act.targetUserId) || "Seseorang" : null,
+      targetUserName: act.targetUserId ? userMap.get(act.targetUserId) ?? "Seseorang" : null,
     }));
 
     return NextResponse.json(enrichedActivities);

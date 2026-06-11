@@ -85,12 +85,15 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     }
     const task = taskDetails[0];
 
-    // 4. Resolusi Nama Pengirim dan Penerima WA
-    const sender = await db.select().from(users).where(eq(users.id, notification.senderId)).limit(1);
-    const senderName = sender.length > 0 ? sender[0].name : "Seseorang";
-
-    const targetUser = await db.select().from(users).where(eq(users.id, targetUserId)).limit(1);
-    const targetName = targetUser.length > 0 ? targetUser[0].name : "Rekan";
+    // 4. Batch-resolve sender and target user names in a single query
+    const userIds = [notification.senderId, targetUserId].filter(Boolean) as string[];
+    const resolvedUsers = await db
+      .select({ id: users.id, name: users.name })
+      .from(users)
+      .where(inArray(users.id, userIds));
+    const userMap = new Map(resolvedUsers.map((u) => [u.id, u.name]));
+    const senderName = userMap.get(notification.senderId) ?? "Seseorang";
+    const targetName = userMap.get(targetUserId) ?? "Rekan";
 
     // 5. Susun Pesan Berdasarkan Jenis Notice (Handover atau Blocker)
     let waMessage = "";

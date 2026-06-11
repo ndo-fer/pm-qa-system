@@ -128,9 +128,9 @@ const priorityColors: Record<string, string> = {
 
 const erpRoleLabels: Record<string, string> = {
   all_roles: "All Roles",
-  administrator: "Administrator (PDJService)",
-  top_user: "Top User (K009)",
-  user: "User (K010)",
+  administrator: "Administrator",
+  top_user: "Top User",
+  user: "User",
 };
 
 export function TaskPreviewModal({
@@ -442,7 +442,7 @@ export function TaskPreviewModal({
                           </p>
                           {act.note && (
                             <div className="mt-1 bg-slate-50 dark:bg-slate-900/50 p-2 rounded border border-slate-100 dark:border-slate-800/40 text-slate-600 dark:text-slate-400 italic">
-                              "{act.note}"
+                              {`"${act.note}"`}
                             </div>
                           )}
                         </div>

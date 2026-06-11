@@ -5,6 +5,7 @@ import { db } from "@/db";
 import { tasks, taskContributors, taskActivities, users, projectMembers } from "@/db/schema";
 import { eq, and } from "drizzle-orm";
 import { randomUUID } from "crypto";
+import { authorizeProjectRole } from "@/lib/auth-helpers";
 
 // GET: Fetch all contributors for a specific task
 export async function GET(request: Request, { params }: { params: Promise<{ id: string }> }) {
@@ -61,13 +62,9 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
 
     const projectId = task[0].projectId;
 
-    // 2. Verify current user's membership in the project
-    const member = await db
-      .select()
-      .from(projectMembers)
-      .where(and(eq(projectMembers.projectId, projectId), eq(projectMembers.userId, session.user.id)))
-      .limit(1);
-    if (member.length === 0) return NextResponse.json({ error: "Access denied" }, { status: 403 });
+    // 2. Verify current user's role in the project (only admin and pm can add contributors)
+    const auth = await authorizeProjectRole(projectId, session.user.id, ["admin", "pm"]);
+    if (!auth.authorized) return auth.errorResponse!;
 
     // 3. Verify target developer is a member of the project
     const targetMember = await db
@@ -184,16 +181,12 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
         .update(taskContributors)
         .set(updates)
         .where(and(eq(taskContributors.taskId, taskId), eq(taskContributors.developerId, developerId)));
-      
-      // If setting to active, deactivate all other contributors and update tasks.assigneeId
+
+      // If setting to active: deactivate all OTHER contributors first, then update assigneeId
       if (isCurrentActive === true) {
-        await db
-          .update(taskContributors)
-          .set({ isCurrentActive: false })
-          .where(and(eq(taskContributors.taskId, taskId), eq(taskContributors.developerId, developerId))); // wait, this was the wrong logic, we want: NOT equal to developerId!
-        
-        // Correct query to set others to false:
+        // Fetch all contributors for this task
         const allContribs = await db.select().from(taskContributors).where(eq(taskContributors.taskId, taskId));
+        // Deactivate everyone except the target developer
         for (const c of allContribs) {
           if (c.developerId !== developerId) {
             await db
@@ -202,8 +195,7 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
               .where(eq(taskContributors.id, c.id));
           }
         }
-
-        // Update task assigneeId
+        // Sync task active assignee
         await db.update(tasks).set({ assigneeId: developerId }).where(eq(tasks.id, taskId));
       }
     }
