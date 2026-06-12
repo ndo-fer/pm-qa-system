@@ -5,6 +5,8 @@ title: Deskripsi Sistem
 
 Selamat datang di dokumentasi teknis **ERP Project Management & QA System** PT Pacific Data Jaya.
 
+![Dashboard Preview](/img/dashboard-preview.png)
+
 Sistem ini adalah platform manajemen proyek berbasis web yang dirancang khusus untuk mengelola seluruh siklus hidup pengembangan perangkat lunak (SDLC). Mulai dari perencanaan milestone, penugasan tugas pengembang, penelusuran kemajuan secara visual via grafik S-Curve, hingga eksekusi pengujian QA berbasis matriks peran (Role-Based Matrix Testing) dengan sinkronisasi otomatis dua arah ke **Google Sheets** dan WhatsApp Bot gateway.
 
 ---

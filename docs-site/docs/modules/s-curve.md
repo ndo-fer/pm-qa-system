@@ -2,6 +2,8 @@
 
 Grafik S-Curve digunakan oleh Project Manager (PM) untuk mendeteksi deviasi jadwal proyek dengan membandingkan target kemajuan rencana akumulatif dengan realisasi kemajuan aktual pengembang di lapangan.
 
+![S-Curve Chart](/img/s-curve-chart.png)
+
 ---
 
 ## 📈 Konsep Perhitungan S-Curve

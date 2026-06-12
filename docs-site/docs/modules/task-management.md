@@ -2,6 +2,8 @@
 
 Modul Manajemen Tugas dirancang untuk mengelola backlog pengembangan sistem ERP, menyelaraskan tugas dengan kebutuhan teknis, serta memantau status pengerjaan pengembang secara real-time.
 
+![Kanban Board Preview](/img/kanban-board-preview.png)
+
 ---
 
 ## 📋 Kanban Board & Status Tugas

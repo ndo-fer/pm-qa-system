@@ -2,6 +2,8 @@
 
 Konsol QA memfasilitasi pengujian fungsionalitas dan hak akses secara mendalam pada modul operasional ERP target dengan pendekatan **Role-Based Matrix Testing**.
 
+![QA Matrix Console](/img/qa-matrix-console.png)
+
 ---
 
 ## 🧪 Konsep Matrix Testing
