@@ -134,11 +134,9 @@ body {
 }
 
 .navbar__logo {
-  height: 2rem;
+  height: 2.2rem;
   width: auto;
   transition: transform 0.3s ease;
-  background-color: #ffffff;
-  padding: 3px;
   border-radius: 6px;
   object-fit: contain;
 }
