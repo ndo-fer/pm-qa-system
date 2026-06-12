@@ -137,6 +137,10 @@ body {
   height: 2rem;
   width: auto;
   transition: transform 0.3s ease;
+  background-color: #ffffff;
+  padding: 3px;
+  border-radius: 6px;
+  object-fit: contain;
 }
 
 .navbar__brand:hover .navbar__logo {

@@ -65,7 +65,7 @@ const config: Config = {
       title: 'PDJ PM',
       logo: {
         alt: 'PT Pacific Data Jaya Logo',
-        src: 'img/logo.svg', // Will use fallback or default logo
+        src: 'img/logo.png',
       },
       items: [
         {
