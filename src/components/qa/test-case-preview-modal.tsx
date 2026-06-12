@@ -16,8 +16,10 @@ import {
   ListTodo, 
   HelpCircle,
   Copy,
-  Check
+  Check,
+  ImageIcon
 } from "lucide-react";
+import { ScreenshotViewer } from "@/components/tasks/screenshot-viewer";
 
 interface TestCase {
   id: string;
@@ -34,6 +36,7 @@ interface TestCase {
   erpRole?: string | null;
   testType?: string | null;
   loginCredentials?: Record<string, unknown> | null;
+  attachmentUrl?: string | null;
 }
 
 interface TestCasePreviewModalProps {
@@ -216,6 +219,23 @@ export function TestCasePreviewModal({
                     </div>
                   </div>
                 )}
+              </div>
+            )}
+
+            {/* Screenshots / Attachments */}
+            {testCase.attachmentUrl && (
+              <div className="bg-white rounded-xl border border-slate-100 p-5 shadow-sm space-y-3">
+                <h3 className="text-sm font-bold text-slate-800 flex items-center gap-2 border-b pb-2 border-slate-100">
+                  <ImageIcon className="w-4 h-4 text-slate-500" />
+                  <span>Execution Proof / Screenshots</span>
+                </h3>
+                <div className="pt-1">
+                  <ScreenshotViewer
+                    screenshotUrl={testCase.attachmentUrl}
+                    taskCode={testCase.caseNumber}
+                    taskTitle={testCase.description}
+                  />
+                </div>
               </div>
             )}
           </div>

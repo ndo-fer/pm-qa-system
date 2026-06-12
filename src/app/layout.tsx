@@ -18,6 +18,9 @@ const geistMono = Geist_Mono({
 export const metadata: Metadata = {
   title: "PDJ Management",
   description: "Unified project management system for ERP development",
+  icons: {
+    icon: "/logo.png",
+  },
 };
 
 export default async function RootLayout({

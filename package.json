@@ -11,7 +11,10 @@
     "db:seed": "tsx _scripts/seed.ts && tsx _scripts/seed-tasks.ts && tsx _scripts/seed-test-cases.ts",
     "db:verify": "tsx _scripts/verify-tasks.ts && tsx _scripts/verify-test-cases.ts",
     "test:e2e": "playwright test",
-    "wa:gateway": "tsx _scripts/wa-gateway.ts"
+    "wa:gateway": "tsx _scripts/wa-gateway.ts",
+    "docs:dev": "npm run start --prefix docs-site",
+    "docs:build": "npm run build --prefix docs-site",
+    "docs:serve": "npm run serve --prefix docs-site"
   },
   "dependencies": {
     "@base-ui/react": "^1.5.0",

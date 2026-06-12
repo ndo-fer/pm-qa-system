@@ -5,6 +5,7 @@ import Link from "next/link";
 import { usePathname, useParams } from "next/navigation";
 import { cn } from "@/lib/utils";
 import { useSession, signOut } from "next-auth/react";
+import Image from "next/image";
 import {
   LayoutDashboard,
   FolderKanban,
@@ -50,30 +51,42 @@ export function Sidebar() {
       <div
         className={cn(
           "flex items-center border-b border-gray-800",
-          collapsed ? "justify-center p-3" : "py-6 pl-6 pr-4 justify-between"
+          collapsed ? "flex-col gap-3 py-4 px-2 justify-center" : "py-6 pl-6 pr-4 justify-between"
         )}
       >
-        {!collapsed && (
-          <div className="flex flex-col min-w-0">
-            <h1 className="text-lg font-bold tracking-tight truncate">PDJ Management</h1>
-            {currentProjectCode && (
-              <span className="text-xs text-blue-400 font-medium truncate mt-0.5">
-                Proyek: {currentProjectCode}
-              </span>
-            )}
+        {!collapsed ? (
+          <div className="flex items-center gap-2.5 min-w-0">
+            <Image
+              src="/logo.png"
+              alt="PDJ Logo"
+              width={32}
+              height={32}
+              className="rounded-md object-contain bg-white p-0.5 shrink-0"
+            />
+            <div className="flex flex-col min-w-0">
+              <h1 className="text-sm font-bold tracking-tight truncate">PDJ Management</h1>
+              {currentProjectCode && (
+                <span className="text-[10px] text-blue-400 font-medium truncate mt-0.5">
+                  Proyek: {currentProjectCode}
+                </span>
+              )}
+            </div>
           </div>
-        )}
-        {collapsed && currentProjectCode && (
-          <span 
-            className="text-[10px] bg-blue-900/50 text-blue-400 font-bold px-1.5 py-0.5 rounded border border-blue-800/50"
-            title={`Proyek: ${currentProjectCode}`}
-          >
-            {currentProjectCode.substring(0, 4)}
-          </span>
+        ) : (
+          <Image
+            src="/logo.png"
+            alt="PDJ Logo"
+            width={28}
+            height={28}
+            className="rounded-md object-contain bg-white p-0.5 shrink-0"
+          />
         )}
         <button
           onClick={() => setCollapsed(!collapsed)}
-          className="text-gray-400 hover:text-white transition-colors cursor-pointer ml-2"
+          className={cn(
+            "text-gray-400 hover:text-white transition-colors cursor-pointer",
+            collapsed ? "mt-1" : "ml-2"
+          )}
         >
           {collapsed ? (
             <PanelLeftOpen className="w-5 h-5" />

@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { signIn } from "next-auth/react";
 import { useRouter } from "next/navigation";
+import Image from "next/image";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -39,7 +40,19 @@ export default function LoginPage() {
   return (
     <div className="flex items-center justify-center min-h-screen bg-gray-100">
       <Card className="w-full max-w-md">
-        <CardHeader className="text-center">
+        <CardHeader className="text-center flex flex-col items-center">
+          <div className="flex justify-center mb-2">
+            <div className="rounded-xl bg-white p-2 shadow-sm border border-gray-150 flex items-center justify-center">
+              <Image
+                src="/logo.png"
+                alt="PDJ Logo"
+                width={56}
+                height={56}
+                className="object-contain"
+                priority
+              />
+            </div>
+          </div>
           <CardTitle className="text-2xl">PDJ Management</CardTitle>
           <CardDescription>Masuk untuk melanjutkan</CardDescription>
         </CardHeader>
