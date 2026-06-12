@@ -187,16 +187,31 @@ body {
   background-color: rgba(37, 194, 160, 0.1);
 }
 
-.menu__link--active {
-  background: linear-gradient(135deg, var(--ifm-color-primary), var(--ifm-color-primary-dark)) !important;
-  color: #ffffff !important;
-  box-shadow: var(--active-sidebar-shadow);
+.menu__link--active:not(.menu__link--sublist) {
+  background: rgba(46, 133, 85, 0.1) !important;
+  color: var(--ifm-color-primary) !important;
   font-weight: 600;
 }
 
-.menu__link--active:hover {
-  color: #ffffff !important;
+[data-theme='dark'] .menu__link--active:not(.menu__link--sublist) {
+  background: rgba(37, 194, 160, 0.15) !important;
+  color: var(--ifm-color-primary) !important;
+}
+
+.menu__link--active:not(.menu__link--sublist):hover {
+  background: rgba(46, 133, 85, 0.15) !important;
+  color: var(--ifm-color-primary) !important;
   transform: none;
+}
+
+[data-theme='dark'] .menu__link--active:not(.menu__link--sublist):hover {
+  background: rgba(37, 194, 160, 0.2) !important;
+}
+
+.menu__link--sublist.menu__link--active {
+  background: none !important;
+  color: var(--ifm-color-content) !important;
+  box-shadow: none !important;
 }
 
 /* Collapse Arrow Animation */
