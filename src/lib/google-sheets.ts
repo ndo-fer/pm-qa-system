@@ -46,6 +46,35 @@ const shouldSync = (scope: SyncScope, target: "tasks" | "qa" | "milestones") => 
   return false;
 };
 
+/**
+ * Wraps any Google Sheets API call with exponential-backoff retry logic.
+ * Retries on rate-limit (429) and transient server errors (5xx).
+ * Throws immediately on permanent client errors (4xx other than 429).
+ */
+async function sheetsRequest<T>(fn: () => Promise<T>, maxRetries = 5): Promise<T> {
+  let attempt = 0;
+  while (true) {
+    try {
+      return await fn();
+    } catch (err: any) {
+      const status: number | undefined = err?.response?.status ?? err?.code;
+      const isRetryable = status === 429 || (status !== undefined && status >= 500);
+      attempt++;
+
+      if (!isRetryable || attempt > maxRetries) {
+        throw err;
+      }
+
+      // Exponential backoff: 1s, 2s, 4s, 8s, 16s (+ ≤500ms jitter)
+      const delay = Math.min(1_000 * Math.pow(2, attempt - 1), 16_000) + Math.random() * 500;
+      console.warn(
+        `[SHEETS RETRY] HTTP ${status} — retrying in ${Math.round(delay)}ms (attempt ${attempt}/${maxRetries})`
+      );
+      await new Promise((res) => setTimeout(res, delay));
+    }
+  }
+}
+
 export async function syncGoogleSheets(options?: SyncOptions) {
   const scope: SyncScope = options?.scope || "all";
   const sheets = await getSheetsClient();
@@ -281,14 +310,14 @@ export async function syncGoogleSheets(options?: SyncOptions) {
       ]);
     }
 
-    await sheets.spreadsheets.values.update({
+    await sheetsRequest(() => sheets.spreadsheets.values.update({
       spreadsheetId,
       range: `Tasks!A1:N${updatedRows.length}`,
       valueInputOption: "USER_ENTERED",
       requestBody: {
         values: updatedRows
       }
-    });
+    }));
 
     const oldRowCount = rows.length;
     const newRowCount = updatedRows.length;
@@ -343,14 +372,14 @@ export async function syncGoogleSheets(options?: SyncOptions) {
       updatedDevBoardRows.push(row);
     }
 
-    await sheets.spreadsheets.values.update({
+    await sheetsRequest(() => sheets.spreadsheets.values.update({
       spreadsheetId,
       range: `Developer Task Board!A1:Z${updatedDevBoardRows.length}`,
       valueInputOption: "USER_ENTERED",
       requestBody: {
         values: updatedDevBoardRows
       }
-    });
+    }));
   }
 
   // ========== MILESTONES & S-CURVE SYNC (scope: all, tasks, milestones) ==========
@@ -392,14 +421,14 @@ export async function syncGoogleSheets(options?: SyncOptions) {
       ]);
     }
 
-    await sheets.spreadsheets.values.update({
+    await sheetsRequest(() => sheets.spreadsheets.values.update({
       spreadsheetId,
       range: `S-Curve Data!A1:I${sCurveRows.length}`,
       valueInputOption: "USER_ENTERED",
       requestBody: {
         values: sCurveRows
       }
-    });
+    }));
 
     const sCurveMeta = await sheets.spreadsheets.values.get({
       spreadsheetId,
@@ -788,14 +817,14 @@ export async function syncGoogleSheets(options?: SyncOptions) {
       ]);
     }
 
-    await sheets.spreadsheets.values.update({
+    await sheetsRequest(() => sheets.spreadsheets.values.update({
       spreadsheetId,
       range: `Test Cases!A1:M${tcUpdatedRows.length}`,
       valueInputOption: "USER_ENTERED",
       requestBody: {
         values: tcUpdatedRows
       }
-    });
+    }));
 
     const tcOldRowCount = tcRows.length;
     const tcNewRowCount = tcUpdatedRows.length;

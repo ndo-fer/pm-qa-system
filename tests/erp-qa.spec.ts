@@ -72,15 +72,14 @@ test.describe("ERP PM System - QA Testing Console E2E Flow", () => {
     console.log("11. Triggering staging server check (expect failure)...");
     await runCheckBtn.click();
     
-    // Wait for error message to appear (either "Error" or "Network Error" text)
-    await Promise.race([
-      expect(page.locator("text=Error").first()).toBeVisible({ timeout: 10000 }),
-      expect(page.locator("text=Network Error").first()).toBeVisible({ timeout: 10000 }),
-    ]);
+    // Wait for error message to appear — use OR-locator to avoid unstable Promise.race
+    await expect(
+      page.locator('[role="alert"], [data-testid="endpoint-result"]').filter({ hasText: /error|gagal|network/i }).first()
+    ).toBeVisible({ timeout: 10000 });
     console.log("✓ Staging API check failed as expected.");
 
     // Step 12: Verify 'Create Defect' checkbox is automatically checked for QA role
-    const createDefectCheckbox = page.locator('input[type="checkbox"]').last();
+    const createDefectCheckbox = page.locator('label:has-text("Create Defect"), label:has-text("Buat Defect")').locator('input[type="checkbox"]');
     await expect(createDefectCheckbox).toBeChecked({ timeout: 3000 });
     console.log("✓ 'Create Defect' checkbox was auto-checked by the system.");
 
