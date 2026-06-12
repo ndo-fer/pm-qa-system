@@ -17,6 +17,7 @@ Sebelum memulai, pastikan perangkat Anda telah terpasang software berikut:
 
 1.  **Clone Repositori & Masuk ke Folder:**
     ```bash
+    git clone https://github.com/ndo-fer/pm-qa-system.git erp-pm-system
     cd erp-pm-system
     ```
 
@@ -44,8 +45,8 @@ cp .env.example .env.local
 Buka berkas `.env.local` dan lengkapi konfigurasi berikut:
 
 ```env
-# Database Path (SQLite)
-DATABASE_URL="file:./erp_pm.db"
+# Database (PostgreSQL — gunakan connection string Neon/Supabase atau PostgreSQL lokal)
+DATABASE_URL="postgresql://user:password@host:5432/dbname?sslmode=require"
 
 # NextAuth Configuration
 NEXTAUTH_SECRET="buat-secret-key-acak-anda-di-sini-minimal-32-karakter"
@@ -55,6 +56,10 @@ NEXTAUTH_URL="http://localhost:3000"
 GOOGLE_SERVICE_ACCOUNT_EMAIL="your-service-account@your-project.iam.gserviceaccount.com"
 GOOGLE_PRIVATE_KEY="-----BEGIN PRIVATE KEY-----\n...\n-----END PRIVATE KEY-----\n"
 GOOGLE_SPREADSHEET_ID="id-spreadsheet-laporan-anda"
+
+# WhatsApp Gateway (opsional — kosongkan untuk mode simulasi lokal)
+WA_GATEWAY_URL="http://localhost:8000/send-message"
+WA_GATEWAY_API_KEY="your-secret-api-key"
 ```
 
 > [!WARNING]

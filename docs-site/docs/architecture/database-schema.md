@@ -1,6 +1,6 @@
 # Skema Database (Database Schema)
 
-Sistem ERP PM & QA menggunakan database SQLite lokal (`erp_pm.db`) yang dimodelkan melalui **Drizzle ORM**.
+Sistem ERP PM & QA menggunakan database **PostgreSQL** (di-host via Neon/Supabase atau server PostgreSQL lokal) yang dimodelkan melalui **Drizzle ORM**.
 
 ---
 

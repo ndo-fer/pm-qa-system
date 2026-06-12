@@ -14,7 +14,7 @@ const config: Config = {
   },
 
   // Set the production url of your site here
-  url: 'https://pm-qa-system.vercel.app',
+  url: 'https://pm-qa-docs.vercel.app',
   // Set the /<baseUrl>/ pathname under which your site is served
   // For Vercel Rewrites, we route it under /docs/
   baseUrl: '/docs/',
@@ -99,10 +99,6 @@ const config: Config = {
             {
               label: 'Aplikasi Produksi',
               href: 'https://pm-qa-system.vercel.app',
-            },
-            {
-              label: 'Google Sheets Tracker',
-              href: 'https://docs.google.com', // Placeholder, user will access their own spreadsheet
             },
           ],
         },

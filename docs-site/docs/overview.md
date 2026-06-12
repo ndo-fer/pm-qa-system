@@ -30,9 +30,9 @@ Sistem mengimplementasikan alur SDLC terintegrasi dengan 4 pilar utama:
 | **Language** | TypeScript 5 | Pemrograman berbasis tipe yang aman |
 | **Runtime & Lib** | React 19.2, Base UI, Lucide React | Library UI modern dan set ikon interaktif |
 | **Styling** | Tailwind CSS 4, Tailwind Merge, Tw-Animate-CSS | Styling utilitas dengan animasi performa tinggi |
-| **Database & ORM** | SQLite + Drizzle ORM | Database relasional lokal yang cepat dengan Drizzle Kit |
+| **Database & ORM** | PostgreSQL + Drizzle ORM | Database relasional cloud-hosted (Neon/Supabase) dengan Drizzle Kit |
 | **Auth** | NextAuth.js v4 (Credentials + JWT) | Manajemen sesi pengguna aman dengan enkripsi Bcrypt |
 | **Charts** | Recharts | Visualisasi performa kemajuan & S-Curve proyek |
 | **PDF Export** | jsPDF + jsPDF-AutoTable | Pembuatan laporan Test Plan & Test Case berformat PDF |
 | **WhatsApp Integration** | `whatsapp-web.js` + Express | Gateway WA headless lokal untuk interaksi bot otomatis |
-| **Automation** | Python, Selenium WebDriver (Edge) | Pengujian E2E otomatis pada sistem lokal & portal staging |
+| **Automation** | Playwright (TypeScript) & Python Selenium (Edge) | Pengujian E2E otomatis internal (Playwright) & portal staging ERP (Selenium) |
