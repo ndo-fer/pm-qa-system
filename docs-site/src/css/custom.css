@@ -451,7 +451,7 @@ code {
 .footer {
   border-top: 1px solid var(--card-border-color);
   background-color: var(--ifm-footer-background-color) !important;
-  padding: 5rem 2rem 4rem !important;
+  padding: 2rem 2rem 1.5rem !important;
 }
 
 .footer__title {
@@ -459,7 +459,7 @@ code {
   font-weight: 700;
   letter-spacing: -0.01em;
   color: #ffffff;
-  margin-bottom: 1.25rem;
+  margin-bottom: 0.5rem;
 }
 
 .footer__link-item {
@@ -475,10 +475,10 @@ code {
 
 .footer__copyright {
   color: #475569;
-  margin-top: 3rem;
+  margin-top: 1.5rem;
   font-size: 0.9rem;
   border-top: 1px solid #1e293b;
-  padding-top: 2rem;
+  padding-top: 1rem;
 }
 
 /* Page Card Improvements (Next / Prev Navigation) */
