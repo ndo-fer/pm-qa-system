@@ -110,5 +110,6 @@ erDiagram
 ---
 
 ## 🗄️ Lokasi Kode Skema
+
 Seluruh skema di atas didefinisikan dalam kode TypeScript menggunakan library Drizzle ORM pada berkas:
 📂 `src/db/schema.ts`

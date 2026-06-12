@@ -14,6 +14,7 @@ Sistem ini adalah platform manajemen proyek berbasis web yang dirancang khusus u
 ## 📸 Fitur Utama
 
 Sistem mengimplementasikan alur SDLC terintegrasi dengan 4 pilar utama:
+
 1. **Multi-Role Authentication & Access Control**: Pembagian peran yang ketat (Admin, PM, Developer, QA) menggunakan NextAuth.js.
 2. **Task Management & Developer Workbook**: Kanban Board drag-and-drop dengan metadata ERP lengkap (Epic, Kode FR, Referensi SRD, Kriteria Penerimaan).
 3. **Modul QA & Matrix Testing**: Pengujian fungsionalitas dan hak akses secara mendalam pada 3 skenario peran ERP target (*Administrator*, *Top User*, dan *User*) sekaligus.

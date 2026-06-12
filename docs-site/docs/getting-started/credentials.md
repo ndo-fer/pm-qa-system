@@ -3,6 +3,7 @@
 Berikut adalah daftar akun pengguna default hasil seeding database yang dapat digunakan untuk simulasi login multi-role pada server lokal (`http://localhost:3000`).
 
 Jalankan perintah berikut untuk membuat akun default:
+
 ```bash
 npm run db:seed
 ```
@@ -22,4 +23,3 @@ npm run db:seed
 
 > [!IMPORTANT]
 > Kata sandi default di-set melalui `_scripts/seed.ts` dan di-enkripsi dengan **Bcrypt** sebelum masuk ke database. Akun ini **hanya untuk lingkungan development lokal**. Jangan gunakan kata sandi yang sama pada deployment produksi publik.
-

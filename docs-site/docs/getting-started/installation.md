@@ -7,37 +7,42 @@ Ikuti langkah-langkah berikut untuk memasang dan menjalankan sistem ERP Project 
 ## 📋 Prasyarat Sistem
 
 Sebelum memulai, pastikan perangkat Anda telah terpasang software berikut:
-*   **Node.js**: Versi `20.x` ke atas (Direkomendasikan Node LTS).
-*   **Python**: Versi `3.9` ke atas (Dibutuhkan untuk menjalankan skrip otomatisasi Selenium).
-*   **Web Browser**: Microsoft Edge (Selenium dikonfigurasi default menggunakan `webdriver.Edge()`).
+
+- **Node.js**: Versi `20.x` ke atas (Direkomendasikan Node LTS).
+- **Python**: Versi `3.9` ke atas (Dibutuhkan untuk menjalankan skrip otomatisasi Selenium).
+- **Web Browser**: Microsoft Edge (Selenium dikonfigurasi default menggunakan `webdriver.Edge()`).
 
 ---
 
 ## ⚙️ Langkah Instalasi
 
-1.  **Clone Repositori & Masuk ke Folder:**
-    ```bash
-    git clone https://github.com/ndo-fer/pm-qa-system.git erp-pm-system
-    cd erp-pm-system
-    ```
+1. **Clone Repositori & Masuk ke Folder:**
 
-2.  **Instalasi Dependensi Node.js:**
-    Jalankan perintah berikut pada terminal di folder root proyek:
-    ```bash
-    npm install
-    ```
+   ```bash
+   git clone https://github.com/ndo-fer/pm-qa-system.git erp-pm-system
+   cd erp-pm-system
+   ```
 
-3.  **Instalasi Dependensi Python (E2E Testing):**
-    Jalankan perintah pip untuk menginstal Selenium dan library penunjang:
-    ```bash
-    pip install selenium argparse
-    ```
+2. **Instalasi Dependensi Node.js:**
+   Jalankan perintah berikut pada terminal di folder root proyek:
+
+   ```bash
+   npm install
+   ```
+
+3. **Instalasi Dependensi Python (E2E Testing):**
+   Jalankan perintah pip untuk menginstal Selenium dan library penunjang:
+
+   ```bash
+   pip install selenium argparse
+   ```
 
 ---
 
 ## 🔑 Konfigurasi Environment Variables
 
 Salin berkas `.env.example` di root directory menjadi `.env.local`:
+
 ```bash
 cp .env.example .env.local
 ```
