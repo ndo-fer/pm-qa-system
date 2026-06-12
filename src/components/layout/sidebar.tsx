@@ -24,7 +24,7 @@ export function Sidebar() {
   const { data: session } = useSession();
 
   const projectCode = params?.projectCode as string;
-  const currentProjectCode = projectCode || session?.user?.projectCode || "ERP-PM";
+  const currentProjectCode = projectCode || session?.user?.projectCode || "PDJ-PM";
 
   const userRole = session?.user?.role;
   const canAccessQA = userRole === "admin" || userRole === "pm" || userRole === "qa";
@@ -64,7 +64,7 @@ export function Sidebar() {
               className="rounded-md object-contain bg-white p-0.5 shrink-0"
             />
             <div className="flex flex-col min-w-0">
-              <h1 className="text-sm font-bold tracking-tight truncate">PDJ Management</h1>
+              <h1 className="text-sm font-bold tracking-tight truncate">PDJ PM</h1>
               {currentProjectCode && (
                 <span className="text-[10px] text-blue-400 font-medium truncate mt-0.5">
                   Proyek: {currentProjectCode}

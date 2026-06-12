@@ -1,6 +1,6 @@
 # Instalasi & Setup Lokal
 
-Ikuti langkah-langkah berikut untuk memasang dan menjalankan sistem ERP Project Management & QA di lingkungan lokal Anda.
+Ikuti langkah-langkah berikut untuk memasang dan menjalankan **PDJ PM** di lingkungan lokal Anda.
 
 ---
 

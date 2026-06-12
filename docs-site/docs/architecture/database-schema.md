@@ -1,6 +1,6 @@
 # Skema Database (Database Schema)
 
-Sistem ERP PM & QA menggunakan database **PostgreSQL** (di-host via Neon/Supabase atau server PostgreSQL lokal) yang dimodelkan melalui **Drizzle ORM**.
+Sistem PDJ PM menggunakan database **PostgreSQL** (di-host via Neon/Supabase atau server PostgreSQL lokal) yang dimodelkan melalui **Drizzle ORM**.
 
 ---
 

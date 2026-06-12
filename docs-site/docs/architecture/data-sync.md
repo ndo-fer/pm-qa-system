@@ -8,7 +8,7 @@ Sistem mengimplementasikan integrasi dua arah (*bidirectional sync*) antara data
 
 ```mermaid
 sequenceDiagram
-    participant WebApp as ERP PM System (Next.js)
+    participant WebApp as PDJ PM (Next.js)
     participant DB as PostgreSQL DB (Neon/Cloud)
     participant API as Google Sheets API v4
     participant Sheet as Google Sheets (Cloud)

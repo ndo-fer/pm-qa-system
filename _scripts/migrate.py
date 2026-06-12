@@ -1,6 +1,6 @@
 """
 Migration script: Import QA test cases, defects, and tasks from Excel spreadsheets
-into the ERP PM System database.
+into the PDJ PM database.
 """
 import sys
 import os
@@ -59,7 +59,7 @@ STATUS_MAP = {
 
 def migrate():
     print("=" * 60)
-    print("ERP PM System - Data Migration")
+    print("PDJ PM - Data Migration")
     print("=" * 60)
 
     # 1. Get or create ERP Migration project

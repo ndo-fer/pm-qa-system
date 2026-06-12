@@ -137,7 +137,7 @@ export function ProjectForm({ open, onOpenChange, project, onSuccess }: ProjectF
             </div>
             <div className="space-y-2">
               <label className="text-sm font-medium">Project Code</label>
-              <Input value={code} onChange={(e) => setCode(e.target.value)} placeholder="e.g. ERP-PM" required />
+              <Input value={code} onChange={(e) => setCode(e.target.value)} placeholder="e.g. PDJ-PM" required />
             </div>
           </div>
           <div className="space-y-2">

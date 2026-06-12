@@ -91,7 +91,7 @@ export function formatBlockerAlert({
   blockerNote,
   dueDate = "Tidak ditentukan",
 }: BlockerAlertParams): string {
-  return `🔴 *[ERP-PM - BLOCKER ALERT]*
+  return `🔴 *[PDJ-PM - BLOCKER ALERT]*
 
 Halo *${recipientName}*,
 
@@ -132,7 +132,7 @@ export function formatTaskHandover({
   dueDate = "Tidak ditentukan",
   note,
 }: TaskHandoverParams): string {
-  return `🔄 *[ERP-PM - SERAH TERIMA TUGAS]*
+  return `🔄 *[PDJ-PM - SERAH TERIMA TUGAS]*
 
 Halo *${recipientName}*,
 
@@ -170,7 +170,7 @@ export function formatProgressUpdate({
   newStatus,
   note,
 }: ProgressUpdateParams): string {
-  return `📈 *[ERP-PM - PROGRESS UPDATE]*
+  return `📈 *[PDJ-PM - PROGRESS UPDATE]*
 
 Halo *${pmName}*,
 
@@ -211,7 +211,7 @@ export function formatQaFailAlert({
   actualResult,
   note,
 }: QaFailAlertParams): string {
-  return `❌ *[ERP-PM - QA TEST FAIL]*
+  return `❌ *[PDJ-PM - QA TEST FAIL]*
 
 Halo *${developerName}*,
 

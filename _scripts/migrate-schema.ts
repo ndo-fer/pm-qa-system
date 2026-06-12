@@ -11,9 +11,9 @@ async function runSchemaMigration() {
     `);
 
     // 2. Set default code for existing project
-    console.log("Setting default code 'ERP-PM' for projects with null code...");
+    console.log("Setting default code 'PDJ-PM' for projects with null code...");
     await db.execute(sql`
-      UPDATE "projects" SET "code" = 'ERP-PM' WHERE "code" IS NULL;
+      UPDATE "projects" SET "code" = 'PDJ-PM' WHERE "code" IS NULL;
     `);
 
     // 3. Make column unique and not null

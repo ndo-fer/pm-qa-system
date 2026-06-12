@@ -67,7 +67,7 @@ const PRIORITY_MAP: Record<string, string> = {
 
 async function migrate() {
   console.log("=".repeat(60));
-  console.log("ERP PM System - Full Data Migration");
+  console.log("PDJ PM - Full Data Migration");
   console.log("=".repeat(60));
 
   // 1. Get or create project
@@ -99,7 +99,7 @@ async function migrate() {
     await db.insert(projects).values({
       id: projectId,
       name: "ERP Migration",
-      code: "ERP-PM",
+      code: "PDJ-PM",
       description: "Migration from SABE desktop system to web-based ERP",
       startDate: "2026-05-20",
       endDate: "2026-11-29",

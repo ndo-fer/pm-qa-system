@@ -3,7 +3,7 @@ import type {Config} from '@docusaurus/types';
 import type * as Preset from '@docusaurus/preset-classic';
 
 const config: Config = {
-  title: 'ERP PM & QA System',
+  title: 'PDJ PM',
   tagline: 'Dokumentasi Teknis & Operasional PT Pacific Data Jaya',
   favicon: 'img/favicon.ico',
 
@@ -22,7 +22,7 @@ const config: Config = {
 
   // GitHub pages deployment config.
   organizationName: 'pacific-data-jaya',
-  projectName: 'erp-pm-docs',
+  projectName: 'pdj-pm-docs',
 
   onBrokenLinks: 'throw',
 
@@ -62,7 +62,7 @@ const config: Config = {
       respectPrefersColorScheme: true,
     },
     navbar: {
-      title: 'ERP PM & QA System',
+      title: 'PDJ PM',
       logo: {
         alt: 'PT Pacific Data Jaya Logo',
         src: 'img/logo.svg', // Will use fallback or default logo
@@ -76,7 +76,7 @@ const config: Config = {
         },
         {
           href: 'https://pm-qa-system.vercel.app',
-          label: 'Aplikasi ERP PM',
+          label: 'Aplikasi PDJ PM',
           position: 'right',
         },
       ],

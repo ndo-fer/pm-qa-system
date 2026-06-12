@@ -3,7 +3,7 @@ slug: /
 title: Deskripsi Sistem
 ---
 
-Selamat datang di dokumentasi teknis **ERP Project Management & QA System** PT Pacific Data Jaya.
+Selamat datang di dokumentasi teknis **PDJ PM** PT Pacific Data Jaya.
 
 ![Dashboard Preview](/img/dashboard-preview.png)
 

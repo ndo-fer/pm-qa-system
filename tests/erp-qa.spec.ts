@@ -1,6 +1,6 @@
 import { test, expect } from "@playwright/test";
 
-test.describe("ERP PM System - QA Testing Console E2E Flow", () => {
+test.describe("PDJ PM - QA Testing Console E2E Flow", () => {
   test("should log in, execute QA checks, simulate staging failure, and verify auto-created defect on Kanban board", async ({ page }) => {
     // Intercept API calls to surface errors clearly
     page.on("response", async (response) => {

@@ -12,7 +12,7 @@ export default function LoginPage() {
   const router = useRouter();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [projectCode, setProjectCode] = useState("ERP-PM");
+  const [projectCode, setProjectCode] = useState("PDJ-PM");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
@@ -53,7 +53,7 @@ export default function LoginPage() {
               />
             </div>
           </div>
-          <CardTitle className="text-2xl">PDJ Management</CardTitle>
+          <CardTitle className="text-2xl">PDJ PM</CardTitle>
           <CardDescription>Masuk untuk melanjutkan</CardDescription>
         </CardHeader>
         <CardContent>
@@ -62,7 +62,7 @@ export default function LoginPage() {
               <label className="text-sm font-medium">Kode Proyek</label>
               <Input
                 type="text"
-                placeholder="ERP-PM"
+                placeholder="PDJ-PM"
                 value={projectCode}
                 onChange={(e) => setProjectCode(e.target.value)}
                 required
