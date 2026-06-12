@@ -66,3 +66,6 @@ next-env.d.ts
 
 # E2E failure screenshots (auto-generated, not source)
 /public/screenshots/
+
+# WhatsApp Bot execution results (auto-generated screenshots/PDFs)
+/wa_bot_reslt/
