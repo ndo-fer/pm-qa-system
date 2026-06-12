@@ -75,6 +75,17 @@ export async function calculateSCurve(projectId: string): Promise<SCurveDataPoin
     phaseWeights[m.phase] = parseFloat(m.plannedWeight || "0");
   });
 
+  // Group tasks by phase to optimize lookup performance
+  const tasksByPhase: Record<string, Task[]> = {};
+  taskList.forEach((t) => {
+    if (t.phase) {
+      if (!tasksByPhase[t.phase]) {
+        tasksByPhase[t.phase] = [];
+      }
+      tasksByPhase[t.phase].push(t);
+    }
+  });
+
   return sCurveTarget.map((w) => {
     const weekEnd = new Date(w.weekEnd + "T23:59:59Z");
     const weekStart = new Date(w.weekStart + "T00:00:00Z");
@@ -96,7 +107,7 @@ export async function calculateSCurve(projectId: string): Promise<SCurveDataPoin
     let totalActual = 0;
     milestoneList.forEach((m) => {
       const weight = phaseWeights[m.phase] || 0;
-      const phaseTasks = taskList.filter((t) => t.phase === m.phase);
+      const phaseTasks = tasksByPhase[m.phase] || [];
       if (phaseTasks.length === 0) {
         // If no tasks are defined yet but it's passed target endDate, assume 0.0 or completed if milestone is done
         if (m.endDate && new Date(m.endDate + "T23:59:59Z") <= weekEnd) {
@@ -250,6 +261,17 @@ export async function calculateSCurveGroup(projectId: string): Promise<SCurveGro
       phaseWeights[m.phase] = parseFloat(m.plannedWeight || "0");
     });
 
+    // Group tasks by phase to optimize lookup performance
+    const tasksByPhase: Record<string, Task[]> = {};
+    taskList.forEach((t) => {
+      if (t.phase) {
+        if (!tasksByPhase[t.phase]) {
+          tasksByPhase[t.phase] = [];
+        }
+        tasksByPhase[t.phase].push(t);
+      }
+    });
+
     const prevPlanned = currentWeekIndex > 0 ? overall[currentWeekIndex - 1].plannedCumulative : 0;
     const weekStart = new Date(activeWeek.weekStart + "T00:00:00Z");
 
@@ -268,7 +290,7 @@ export async function calculateSCurveGroup(projectId: string): Promise<SCurveGro
       let dayCompletedTasks: { id: string; title: string; phase: string; taskCode: string | null; completedAt: string }[] = [];
 
       if (!isFuture) {
-        actualVal = calculateActualProgressAtDate(dayDateStr, milestoneList, taskList, phaseWeights);
+        actualVal = calculateActualProgressAtDate(dayDateStr, milestoneList, tasksByPhase, phaseWeights);
 
         const dayStart = new Date(dayDateStr + "T00:00:00Z");
         const dayEnd = new Date(dayDateStr + "T23:59:59Z");
@@ -325,7 +347,7 @@ export async function calculateSCurveGroup(projectId: string): Promise<SCurveGro
 function calculateActualProgressAtDate(
   dateStr: string,
   milestoneList: Milestone[],
-  taskList: Task[],
+  tasksByPhase: Record<string, Task[]>,
   phaseWeights: Record<string, number>
 ): number {
   const cutoff = new Date(dateStr + "T23:59:59Z");
@@ -333,7 +355,7 @@ function calculateActualProgressAtDate(
 
   milestoneList.forEach((m) => {
     const weight = phaseWeights[m.phase] || 0;
-    const phaseTasks = taskList.filter((t) => t.phase === m.phase);
+    const phaseTasks = tasksByPhase[m.phase] || [];
     if (phaseTasks.length === 0) {
       if (m.endDate && new Date(m.endDate + "T23:59:59Z") <= cutoff) {
         totalActual += (m.status === "completed" ? 1.0 : 0.0) * weight;

@@ -10,6 +10,7 @@ const config: Config = {
   // Future flags, see https://docusaurus.io/docs/api/docusaurus-config#future
   future: {
     v4: true,
+    faster: true,
   },
 
   // Set the production url of your site here
@@ -23,8 +24,7 @@ const config: Config = {
   organizationName: 'pacific-data-jaya',
   projectName: 'erp-pm-docs',
 
-  onBrokenLinks: 'warn', // Warn instead of throw to prevent build failures during setup
-  onBrokenMarkdownLinks: 'warn',
+  onBrokenLinks: 'throw',
 
   i18n: {
     defaultLocale: 'id', // Default language is Indonesian
@@ -33,6 +33,9 @@ const config: Config = {
 
   markdown: {
     mermaid: true, // Enable Mermaid diagrams
+    hooks: {
+      onBrokenMarkdownLinks: 'throw',
+    },
   },
   themes: ['@docusaurus/theme-mermaid'], // Enable Mermaid theme
 
