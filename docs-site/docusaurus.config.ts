@@ -17,6 +17,7 @@ const config: Config = {
   // Set the /<baseUrl>/ pathname under which your site is served
   // For Vercel Rewrites, we route it under /docs/
   baseUrl: '/docs/',
+  trailingSlash: false,
 
   // GitHub pages deployment config.
   organizationName: 'pacific-data-jaya',
