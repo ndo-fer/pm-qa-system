@@ -10,34 +10,55 @@ import { authorizeProjectRole } from "@/lib/auth-helpers";
  * These credentials MUST NOT be present in any client-side component.
  * Rotate immediately if the staging server is internet-accessible.
  */
-const ERP_CREDENTIALS: Record<string, unknown> = {
-  administrator: {
-    type: "single",
-    username: process.env.ERP_CRED_ADMIN_USER || "PDJService",
-    password: process.env.ERP_CRED_ADMIN_PASS || "pdj123",
-    role: "administrator",
-  },
-  top_user: {
-    type: "single",
-    username: process.env.ERP_CRED_TOPUSER_USER || "K009",
-    password: process.env.ERP_CRED_TOPUSER_PASS || "123456",
-    role: "top_user",
-  },
-  user: {
-    type: "single",
-    username: process.env.ERP_CRED_USER_USER || "K010",
-    password: process.env.ERP_CRED_USER_PASS || "12345",
-    role: "user",
-  },
-  matrix: {
-    type: "matrix",
-    scenarios: [
-      { role: "administrator", username: process.env.ERP_CRED_ADMIN_USER || "PDJService", password: process.env.ERP_CRED_ADMIN_PASS || "pdj123" },
-      { role: "top_user",     username: process.env.ERP_CRED_TOPUSER_USER || "K009",       password: process.env.ERP_CRED_TOPUSER_PASS || "123456" },
-      { role: "user",         username: process.env.ERP_CRED_USER_USER || "K010",           password: process.env.ERP_CRED_USER_PASS || "12345" },
-    ],
-  },
-};
+
+function getEnvOrThrow(key: string): string {
+  const value = process.env[key];
+  if (!value) {
+    throw new Error(
+      `[QA CREDENTIALS] Environment variable ${key} is not set. ` +
+      `Add it to .env.local — never hardcode credentials.`
+    );
+  }
+  return value;
+}
+
+function buildCredentials() {
+  const adminUser = getEnvOrThrow("ERP_CRED_ADMIN_USER");
+  const adminPass = getEnvOrThrow("ERP_CRED_ADMIN_PASS");
+  const topUser = getEnvOrThrow("ERP_CRED_TOPUSER_USER");
+  const topPass = getEnvOrThrow("ERP_CRED_TOPUSER_PASS");
+  const userUser = getEnvOrThrow("ERP_CRED_USER_USER");
+  const userPass = getEnvOrThrow("ERP_CRED_USER_PASS");
+
+  return {
+    administrator: {
+      type: "single" as const,
+      username: adminUser,
+      password: adminPass,
+      role: "administrator",
+    },
+    top_user: {
+      type: "single" as const,
+      username: topUser,
+      password: topPass,
+      role: "top_user",
+    },
+    user: {
+      type: "single" as const,
+      username: userUser,
+      password: userPass,
+      role: "user",
+    },
+    matrix: {
+      type: "matrix" as const,
+      scenarios: [
+        { role: "administrator", username: adminUser, password: adminPass },
+        { role: "top_user", username: topUser, password: topPass },
+        { role: "user", username: userUser, password: userPass },
+      ],
+    },
+  };
+}
 
 export async function GET(request: Request) {
   const session = await getServerSession(authOptions);
@@ -59,6 +80,14 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: "Invalid role parameter" }, { status: 400 });
   }
 
-  const credentials = ERP_CREDENTIALS[role] ?? ERP_CREDENTIALS.matrix;
-  return NextResponse.json(credentials);
+  try {
+    const credentials = buildCredentials();
+    const result = credentials[role as keyof typeof credentials] ?? credentials.matrix;
+    return NextResponse.json(result);
+  } catch (error) {
+    return NextResponse.json(
+      { error: "ERP credentials not configured on server. Check .env.local." },
+      { status: 503 }
+    );
+  }
 }

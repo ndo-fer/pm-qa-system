@@ -1,8 +1,10 @@
 import express from "express";
 import { Client, LocalAuth } from "whatsapp-web.js";
-import qrcode from "qrcode-terminal";
+import qrcodeTerminal from "qrcode-terminal";
+import QRCode from "qrcode";
 import dotenv from "dotenv";
 import path from "path";
+import { cleanupPuppeteer } from "./cleanup-puppeteer";
 
 // Load environment variables from .env.local
 dotenv.config({ path: path.resolve(process.cwd(), ".env.local") });
@@ -38,6 +40,26 @@ let activeClient: Client | null = null;
 let reconnectAttempts = 0;
 const MAX_RECONNECT_DELAY_MS = 60_000;
 
+interface GatewayState {
+  status: "INITIALIZING" | "LOADING" | "SCAN_QR" | "AUTHENTICATED" | "CONNECTED" | "DISCONNECTED";
+  qrCode: string | null;
+  qrDataUrl: string | null;
+  user: {
+    user: string;
+    pushname: string;
+    platform?: string;
+  } | null;
+  error: string | null;
+}
+
+const gatewayState: GatewayState = {
+  status: "INITIALIZING",
+  qrCode: null,
+  qrDataUrl: null,
+  user: null,
+  error: null,
+};
+
 function createClientOptions() {
   return {
     authStrategy: new LocalAuth({ dataPath: ".wwebjs_auth" }),
@@ -55,6 +77,11 @@ function createClientOptions() {
 }
 
 function initWhatsAppClient() {
+  gatewayState.status = "INITIALIZING";
+  gatewayState.qrCode = null;
+  gatewayState.qrDataUrl = null;
+  gatewayState.error = null;
+
   const client = new Client(createClientOptions());
   activeClient = client;
 
@@ -62,22 +89,43 @@ function initWhatsAppClient() {
 
   client.on("loading_screen", (percent, message) => {
     console.log(`[GATEWAY] Memuat halaman WhatsApp Web: ${percent}% - ${message}`);
+    gatewayState.status = "LOADING";
+    gatewayState.qrCode = null;
+    gatewayState.qrDataUrl = null;
+    gatewayState.error = null;
   });
 
-  client.on("qr", (qr) => {
+  client.on("qr", async (qr) => {
     console.log("\n========================================================");
     console.log("PINDAI QR CODE DI BAWAH INI DENGAN WHATSAPP HP ANDA:");
     console.log("========================================================\n");
-    qrcode.generate(qr, { small: true });
+    qrcodeTerminal.generate(qr, { small: true });
+
+    gatewayState.status = "SCAN_QR";
+    gatewayState.qrCode = qr;
+    try {
+      gatewayState.qrDataUrl = await QRCode.toDataURL(qr);
+    } catch (err) {
+      console.error("[GATEWAY ERROR] Gagal membuat QR Data URL:", err);
+      gatewayState.qrDataUrl = null;
+    }
+    gatewayState.error = null;
   });
 
   client.on("authenticated", () => {
     console.log("[GATEWAY] Autentikasi berhasil, sinkronisasi data...");
+    gatewayState.status = "AUTHENTICATED";
+    gatewayState.qrCode = null;
+    gatewayState.qrDataUrl = null;
+    gatewayState.error = null;
   });
 
   client.on("auth_failure", (msg) => {
     console.error("[GATEWAY ERROR] Autentikasi gagal:", msg);
-    // Auth failures may be unrecoverable without a new QR scan — log and wait.
+    gatewayState.status = "DISCONNECTED";
+    gatewayState.qrCode = null;
+    gatewayState.qrDataUrl = null;
+    gatewayState.error = msg;
   });
 
   client.on("change_state", (state) => {
@@ -90,7 +138,16 @@ function initWhatsAppClient() {
     console.log("GATEWAY WHATSAPP SIAP & BERHASIL LOGIN!");
     if (client.info) {
       console.log(`Login sebagai: ${client.info.wid.user} (${client.info.pushname})`);
+      gatewayState.user = {
+        user: client.info.wid.user,
+        pushname: client.info.pushname,
+        platform: client.info.platform,
+      };
     }
+    gatewayState.status = "CONNECTED";
+    gatewayState.qrCode = null;
+    gatewayState.qrDataUrl = null;
+    gatewayState.error = null;
     console.log("========================================================\n");
   });
 
@@ -103,6 +160,12 @@ function initWhatsAppClient() {
       `Percobaan ke-${reconnectAttempts}, mencoba ulang dalam ${delay / 1000}s...`
     );
 
+    gatewayState.status = "DISCONNECTED";
+    gatewayState.qrCode = null;
+    gatewayState.qrDataUrl = null;
+    gatewayState.user = null;
+    gatewayState.error = reason;
+
     // Destroy the dead instance cleanly, then create a brand-new Client.
     try {
       await client.destroy();
@@ -112,6 +175,8 @@ function initWhatsAppClient() {
     activeClient = null;
 
     setTimeout(() => {
+      console.log("[GATEWAY] Membersihkan sisa proses chrome...");
+      cleanupPuppeteer();
       console.log("[GATEWAY] Membuat instance client baru...");
       initWhatsAppClient();
     }, delay);
@@ -128,17 +193,16 @@ function initWhatsAppClient() {
 // All endpoints read from `activeClient` so they always use the live instance.
 // =========================================================================
 
-// GET /status — health check
+// GET /status — health check & status state
 app.get("/status", (req, res) => {
-  if (activeClient?.info) {
-    return res.json({
-      ready: true,
-      user: activeClient.info.wid.user,
-      pushname: activeClient.info.pushname,
-      platform: activeClient.info.platform,
-    });
-  }
-  return res.json({ ready: false, message: "Client not ready yet" });
+  return res.json({
+    status: gatewayState.status,
+    qrCode: gatewayState.qrCode,
+    qrDataUrl: gatewayState.qrDataUrl,
+    user: gatewayState.user,
+    error: gatewayState.error,
+    ready: gatewayState.status === "CONNECTED"
+  });
 });
 
 // GET /check-number/:phone — verify if a number is on WhatsApp
@@ -159,8 +223,9 @@ app.get("/check-number/:phone", async (req, res) => {
   try {
     const isRegistered = await activeClient.isRegisteredUser(jid);
     return res.json({ phone, jid, isRegistered });
-  } catch (err: any) {
-    return res.status(500).json({ error: err.message });
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : String(err);
+    return res.status(500).json({ error: msg });
   }
 });
 
@@ -198,6 +263,7 @@ app.post("/send-message", async (req, res) => {
 // =========================================================================
 app.listen(PORT, () => {
   console.log(`Gateway API server berjalan di http://localhost:${PORT}`);
+  cleanupPuppeteer();
   console.log("Menghubungkan ke WhatsApp Web...");
   initWhatsAppClient();
 });

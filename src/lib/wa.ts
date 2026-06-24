@@ -1,6 +1,7 @@
 import { db } from "@/db";
 import { users } from "@/db/schema";
 import { eq } from "drizzle-orm";
+import { logger } from "./logger";
 
 interface SendWaParams {
   recipientPhone?: string;
@@ -19,13 +20,13 @@ export async function sendWhatsAppNotification({ recipientPhone, recipientId, me
   }
 
   if (!phone) {
-    console.log(`[WA GATEWAY - NO RECIPIENT PHONE] Target: ${recipientId || "Unknown"}, Message: ${message}`);
+    logger.info(`[WA GATEWAY - NO RECIPIENT PHONE] Target: ${recipientId || "Unknown"}, Message: ${message}`);
     return false;
   }
 
   const gatewayUrl = process.env.WA_GATEWAY_URL; // e.g. http://localhost:8000/send-message
   if (!gatewayUrl) {
-    console.log(`[WA GATEWAY MOCK] To: ${phone}, Message: ${message}`);
+    logger.info(`[WA GATEWAY MOCK] To: ${phone}, Message: ${message}`);
     return true;
   }
 
@@ -47,20 +48,70 @@ export async function sendWhatsAppNotification({ recipientPhone, recipientId, me
     });
     clearTimeout(timeoutId);
     if (response.ok) {
-      console.log(`[WA GATEWAY SUCCESS] Message successfully sent to ${phone}`);
+      logger.info(`[WA GATEWAY SUCCESS] Message successfully sent to ${phone}`);
       return true;
     } else {
-      console.error(`[WA GATEWAY FAILED] HTTP status ${response.status} sending to ${phone}`);
+      logger.error(`[WA GATEWAY FAILED] HTTP status ${response.status} sending to ${phone}`);
       return false;
     }
-  } catch (error: any) {
+  } catch (error: unknown) {
     clearTimeout(timeoutId);
-    if (error.name === "AbortError") {
-      console.error(`[WA GATEWAY TIMEOUT] Request timed out sending to ${phone}`);
+    const msg = error instanceof Error ? error.message : String(error);
+    if (error instanceof Error && error.name === "AbortError") {
+      logger.error(`[WA GATEWAY TIMEOUT] Request timed out sending to ${phone}`);
     } else {
-      console.error(`[WA GATEWAY ERROR] Connection error sending to ${phone}:`, error);
+      logger.error(`[WA GATEWAY ERROR] Connection error sending to ${phone}: ${msg}`);
     }
     return false;
+  }
+}
+
+export async function getWhatsAppStatus() {
+  const gatewayUrl = process.env.WA_GATEWAY_URL;
+  if (!gatewayUrl) {
+    return {
+      status: "MOCK_MODE",
+      ready: true,
+      message: "Gateway in mock mode (no WA_GATEWAY_URL set)",
+    };
+  }
+
+  const statusUrl = gatewayUrl.replace("/send-message", "/status");
+
+  const headers: Record<string, string> = { "Content-Type": "application/json" };
+  const apiKey = process.env.WA_GATEWAY_API_KEY;
+  if (apiKey) {
+    headers["Authorization"] = `Bearer ${apiKey}`;
+  }
+
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 5000);
+
+  try {
+    const response = await fetch(statusUrl, {
+      method: "GET",
+      headers,
+      signal: controller.signal,
+      cache: "no-store",
+    });
+    clearTimeout(timeoutId);
+    if (response.ok) {
+      return await response.json();
+    } else {
+      return {
+        status: "ERROR",
+        ready: false,
+        error: `HTTP status ${response.status}`,
+      };
+    }
+  } catch (error: unknown) {
+    clearTimeout(timeoutId);
+    const msg = error instanceof Error ? error.message : String(error);
+    return {
+      status: "UNREACHABLE",
+      ready: false,
+      error: `Could not connect to gateway: ${msg}`,
+    };
   }
 }
 

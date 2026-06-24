@@ -12,7 +12,7 @@ interface TaskSeed {
   priority: string;
   feature?: string;
   taskType?: string;
-  roleSpecificFeatures?: any;
+  roleSpecificFeatures?: Record<string, { features: string[]; description: string }>;
 }
 
 async function seedTasks() {

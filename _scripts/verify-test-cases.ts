@@ -61,11 +61,11 @@ async function verifyTestCases() {
     if (tc.erpRole === "matrix") {
       matrixCount++;
       try {
-        const creds = tc.loginCredentials as any;
+        const creds = tc.loginCredentials as { type?: string; scenarios?: Array<{ role: string }> } | null;
         if (creds && creds.type === "matrix" && creds.scenarios && creds.scenarios.length === 3) {
-          const hasAllRoles = creds.scenarios.some((s: any) => s.role === "administrator") &&
-                             creds.scenarios.some((s: any) => s.role === "top_user") &&
-                             creds.scenarios.some((s: any) => s.role === "user");
+          const hasAllRoles = creds.scenarios.some((s: { role: string }) => s.role === "administrator") &&
+                             creds.scenarios.some((s: { role: string }) => s.role === "top_user") &&
+                             creds.scenarios.some((s: { role: string }) => s.role === "user");
           if (hasAllRoles) {
             validCredentials++;
           } else {

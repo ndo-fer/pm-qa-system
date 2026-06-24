@@ -201,7 +201,7 @@ export async function PUT(request: Request) {
       status: body.status ?? existing.status,
       notes: body.notes ?? existing.notes,
       executedBy: body.executedBy ?? existing.executedBy,
-      executedAt: body.executedAt ?? new Date().toISOString(),
+      executedAt: body.executedAt !== undefined ? body.executedAt : (body.status !== undefined && body.status !== existing.status ? new Date().toISOString() : existing.executedAt),
       erpRole: body.erpRole ?? existing.erpRole,
       testType: body.testType ?? existing.testType,
       loginCredentials: body.loginCredentials ?? existing.loginCredentials,

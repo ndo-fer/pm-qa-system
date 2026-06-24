@@ -14,7 +14,7 @@ function readExcel(sheet: string) {
   return XLSX.utils.sheet_to_json(ws, { defval: "" }) as Record<string, any>[];
 }
 
-function excelDateToDate(serial: any): Date {
+function excelDateToDate(serial: unknown): Date {
   if (serial instanceof Date) return serial;
   if (typeof serial === "string") {
     if (/^\d{4}-\d{2}-\d{2}/.test(serial)) {
@@ -35,7 +35,7 @@ function excelDateToDate(serial: any): Date {
   return new Date();
 }
 
-function excelDateToString(serial: any): string {
+function excelDateToString(serial: unknown): string {
   if (!serial) return "";
   try {
     const d = excelDateToDate(serial);

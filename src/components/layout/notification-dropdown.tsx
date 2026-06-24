@@ -38,8 +38,8 @@ export function NotificationDropdown() {
       if (res.ok) {
         setNotifications(await res.json());
       }
-    } catch (err) {
-      console.error("Failed to load notifications:", err);
+    } catch {
+      // Silently handle notification fetch failures
     }
   }, []);
 

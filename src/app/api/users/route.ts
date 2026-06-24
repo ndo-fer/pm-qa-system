@@ -16,6 +16,7 @@ export async function GET() {
     name: users.name,
     email: users.email,
     role: users.role,
+    permissions: users.permissions,
     createdAt: users.createdAt,
   }).from(users).orderBy(users.name);
 
@@ -51,6 +52,7 @@ export async function POST(request: Request) {
     email: body.email,
     passwordHash,
     role: userRole,
+    permissions: body.permissions || null,
   };
 
   let safeUser: {
@@ -58,6 +60,7 @@ export async function POST(request: Request) {
     name: string;
     email: string;
     role: "admin" | "pm" | "developer" | "qa";
+    permissions?: string[] | null;
     createdAt: string | null;
   };
 
@@ -69,6 +72,7 @@ export async function POST(request: Request) {
       name: created.name,
       email: created.email,
       role: created.role,
+      permissions: created.permissions,
       createdAt: created.createdAt,
     };
 
@@ -107,10 +111,15 @@ export async function PUT(request: Request) {
     name: string;
     role: "admin" | "pm" | "developer" | "qa";
     passwordHash?: string;
+    permissions?: string[] | null;
   } = {
     name: body.name ?? existing[0].name,
     role: body.role ?? existing[0].role,
   };
+
+  if (body.permissions !== undefined) {
+    updateData.permissions = body.permissions;
+  }
 
   if (body.password) {
     updateData.passwordHash = await bcrypt.hash(body.password, 10);
@@ -121,6 +130,7 @@ export async function PUT(request: Request) {
     name: string;
     email: string;
     role: "admin" | "pm" | "developer" | "qa";
+    permissions?: string[] | null;
     createdAt: string | null;
   } | null = null;
 
@@ -132,6 +142,7 @@ export async function PUT(request: Request) {
       name: created.name,
       email: created.email,
       role: created.role,
+      permissions: created.permissions,
       createdAt: created.createdAt,
     };
 

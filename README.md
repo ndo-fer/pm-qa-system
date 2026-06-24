@@ -3,7 +3,7 @@
 
 🌐 **Live Production Link:** [https://pm-qa-system.vercel.app](https://pm-qa-system.vercel.app)
 
-**PDJ PM** adalah sistem manajemen proyek berbasis web yang dirancang khusus untuk mengelola seluruh siklus hidup pengembangan perangkat lunak (SDLC). Mulai dari perencanaan milestone, penugasan tugas pengembang, penelusuran kemajuan secara visual via grafik S-Curve, hingga eksekusi pengujian QA berbasis matriks peran (Role-Based Matrix Testing) dengan sinkronisasi otomatis dua arah ke **Google Sheets**.
+**PDJ PM** adalah sistem manajemen multi-proyek berbasis web yang dirancang khusus untuk mengelola seluruh siklus hidup pengembangan perangkat lunak (SDLC) ERP yang kompleks. Awalnya diinisiasi untuk mengatasi kendala pembacaan spesifikasi dokumen kebutuhan (SRD) setebal 300++ halaman, sistem ini berevolusi untuk mendukung pengelolaan multi-proyek, pelacakan milestone secara visual via grafik S-Curve dinamis, eksekusi pengujian QA berbasis matriks peran (Role-Matrix Testing), notasi instan (In-App & WhatsApp Bot), serta sinkronisasi otomatis dua arah ke Google Sheets.
 
 ## 📸 Preview Aplikasi
 
@@ -42,12 +42,14 @@
 | **Language** | TypeScript 5 | Pemrograman berbasis tipe yang aman |
 | **Runtime & Lib** | React 19.2, Base UI, Lucide React | Library UI modern dan set ikon interaktif |
 | **Styling** | Tailwind CSS 4, Tailwind Merge, Tw-Animate-CSS | Styling utilitas dengan animasi performa tinggi |
-| **Database** | SQLite (`erp_pm.db`) | Database relasional lokal yang cepat |
+| **Database** | PostgreSQL | Database relasional untuk data transaksional terpusat |
 | **ORM** | Drizzle ORM | TypeScript ORM dengan Drizzle Kit migration tool |
 | **Auth** | NextAuth.js v4 (Credentials + JWT) | Manajemen sesi pengguna aman dengan enkripsi Bcrypt |
 | **Charts** | Recharts | Visualisasi performa kemajuan & S-Curve proyek |
 | **PDF Export** | jsPDF + jsPDF-AutoTable | Pembuatan laporan Test Plan & Test Case berformat PDF |
 | **Integration** | Google Sheets API v4 | Sinkronisasi dua arah real-time untuk data Tasks & QA |
+| **Notification Gateway** | WhatsApp-Web.js (Node.js Express) | Headless WhatsApp Web gateway server dengan auto-reconnection untuk push alerts |
+| **Notifications** | In-App Alerts | Notifikasi real-time dalam aplikasi untuk update status tugas, blocker, dan defect |
 | **Automation** | Python, Selenium WebDriver (Edge) | Pengujian E2E otomatis pada sistem lokal & portal staging |
 
 </details>
@@ -55,45 +57,61 @@
 <details>
 <summary><b>✨ Fitur Utama</b></summary>
 
-### 1. Multi-Role Authentication & Access Control
+### 1. Dynamic Multi-Project Management & Routing
+Sistem telah dimodernisasi sepenuhnya untuk mengelola beberapa proyek secara mandiri. Menggunakan perutean dinamis `/[projectCode]/dashboard`, setiap proyek memiliki milestone, bobot pengerjaan, daftar tugas pengembang, dan rencana uji QA yang terisolasi.
+
+### 2. Multi-Role Authentication & Access Control
 Sistem mengimplementasikan otentikasi berbasis NextAuth dengan pembagian peran yang ketat:
 *   🔑 **Admin**: Akses penuh ke seluruh sistem, termasuk manajemen pengguna (CRUD Users).
 *   📋 **Project Manager (PM)**: Membuat proyek, melacak milestone, memantau kurva S-Curve, dan mengelola pembagian tugas.
 *   💻 **Developer**: Melihat daftar tugas pribadi di Kanban board, memperbarui kemajuan (progress), melaporkan kendala (blocker), dan melampirkan bukti tangkapan layar.
 *   🧪 **QA (Quality Assurance)**: Menyusun Test Plan per modul operasional, merancang Test Cases dengan skenario matriks peran ERP, melakukan eksekusi pengujian, serta mencatat log kesalahan.
 
-### 2. Task Management & Developer Workbook
-Setiap tugas dilengkapi dengan metadata lengkap yang mengacu pada standar pengembangan:
+### 3. Task Management & Developer Workbook (SRD Linked)
+Menyembuhkan kegagalan pembacaan dokumen spesifikasi kebutuhan (SRD) cetak dengan mengintegrasikannya langsung ke alur kerja digital:
 *   **Kanban Board**: Drag-and-drop interaktif untuk status `To Do` ➔ `In Progress` ➔ `Review` ➔ `Done`.
 *   **Developer Workbook Details**: Mencakup pemetaan Epic (MST, PUR, SLS, PRD, INV, dll.), Kode FR (Functional Requirement), Referensi SRD (Software Requirements Document), Kriteria Penerimaan (Acceptance Criteria), Fase Target (Phase 1-7), tingkat prioritas, progress (%) serta deskripsi Blocker.
 *   **ERP Role Context**: Menghubungkan tugas dengan peran spesifik di sistem ERP target (`administrator`, `top_user`, `user`, atau `all_roles`) beserta daftar fitur terkait berformat JSON.
 
-### 3. Modul QA & Pengujian Matriks (Matrix Testing)
+### 4. Modul QA & Pengujian Matriks (Matrix Testing)
 Memfasilitasi pengujian fungsional dan hak akses secara mendalam pada sistem ERP:
 *   **Test Plans**: Dikelompokkan berdasarkan modul operasional utama (Pemasok, Pelanggan, Barang, Katalog Lain, Pengaturan, Keuangan, Kinerja).
 *   **Matrix Test Cases**: Satu test case dapat menguji 3 skenario peran sekaligus (`Administrator`, `Top User`, dan `User`) dengan kredensial masuk yang terintegrasi.
 *   **Automated Defect Loop**: Jika pengujian pada Real Staging API mengembalikan respon kegagalan (misalnya 401 Unauthorized karena token kedaluwarsa), sistem secara otomatis membuat tugas baru bertipe **[DEFECT]** di Kanban board agar segera diperbaiki oleh pengembang terkait.
 
-### 4. Sinkronisasi Google Sheets & Kalkulasi S-Curve
-Integrasi dua arah yang memastikan keselarasan data lokal dengan lembar laporan manajemen:
-*   **Bidirectional Sync**: Perubahan status tugas atau hasil tes di Google Sheets dapat diimpor langsung ke database SQLite lokal, begitu pula sebaliknya.
-*   **S-Curve Engine**: Menghitung secara dinamis bobot rencana kemajuan mingguan (Planned Cumulative %) dibanding kemajuan nyata pengembang di lapangan (Actual Cumulative %) untuk mendeteksi deviasi jadwal proyek.
+### 5. Push Alerts Real-Time & Blocker Notifications (In-App & WA Bot)
+Mempermudah koordinasi tim saat terdapat kendala tugas atau deteksi kegagalan sistem:
+*   **In-App Alerts**: Memunculkan badge notifikasi real-time di UI pengguna tentang penugasan baru, status update, blocker, atau defect.
+*   **WhatsApp Bot Message**: Integrasi dengan API gateway WhatsApp Web. Setiap kali ada blocker baru yang dilaporkan oleh developer atau defect baru yang dibuat oleh QA, sistem secara otomatis mengirimkan notifikasi pesan teks berisi deskripsi kendala langsung ke ponsel WhatsApp developer yang bersangkutan.
+
+### 6. Sinkronisasi Google Sheets & Kalkulasi S-Curve Proyek
+Integrasi dua arah yang memastikan keselarasan data database lokal dengan lembar laporan manajemen:
+*   **Bidirectional Sync**: Perubahan status tugas atau hasil tes di Google Sheets dapat diimpor langsung ke database PostgreSQL lokal, begitu pula sebaliknya.
+*   **S-Curve Engine**: Menghitung secara dinamis bobot rencana kemajuan mingguan (Planned Cumulative %) dibanding kemajuan nyata pengembang di lapangan (Actual Cumulative %) per proyek secara terpisah untuk mendeteksi deviasi jadwal proyek secara presisi.
 
 </details>
 
 <details>
 <summary><b>📊 Struktur Database (Drizzle Schema)</b></summary>
 
-Database SQLite dikelola menggunakan **Drizzle ORM** dengan relasi sebagai berikut:
+Database PostgreSQL dikelola menggunakan **Drizzle ORM** dengan relasi sebagai berikut:
 
 ```mermaid
 erDiagram
+    users ||--o{ project_members : member_of
+    projects ||--o{ project_members : has_members
     users ||--o{ tasks : assigned_to
     users ||--o{ test_cases : executed_by
     projects ||--o{ tasks : contains
     projects ||--o{ test_plans : has
     projects ||--o{ milestones : tracks
     test_plans ||--o{ test_cases : includes
+    tasks ||--o{ task_contributors : has_contributors
+    users ||--o{ task_contributors : is_contributor
+    tasks ||--o{ task_activities : tracks_activity
+    users ||--o{ task_activities : triggers_activity
+    users ||--o{ notifications : receives_notifications
+    users ||--o{ notifications : sends_notifications
     
     users {
         string id PK
@@ -101,18 +119,28 @@ erDiagram
         string email UK
         string passwordHash
         string role "admin | pm | developer | qa"
+        string phone
         timestamp createdAt
     }
     
     projects {
         string id PK
         string name
+        string code UK
         string description
         string startDate
         string endDate
         string status "planned | active | on_hold | completed"
         json sCurveTarget
         json sCurveActual
+        timestamp createdAt
+    }
+
+    project_members {
+        string id PK
+        string projectId FK
+        string userId FK
+        string role "admin | pm | developer | qa"
         timestamp createdAt
     }
     
@@ -141,6 +169,7 @@ erDiagram
         string erpRole "administrator | top_user | user | all_roles"
         json roleSpecificFeatures
         timestamp updatedAt
+        timestamp createdAt
     }
     
     test_plans {
@@ -155,7 +184,6 @@ erDiagram
     test_cases {
         string id PK
         string testPlanId FK
-        string executedBy FK
         string caseNumber
         string description
         string steps
@@ -163,10 +191,12 @@ erDiagram
         string actualResult
         string status "pending | pass | fail | blocked"
         string notes
+        string executedBy FK
         string executedAt
         string erpRole "administrator | top_user | user | matrix"
         string testType "functional | permission | workflow | matrix"
         json loginCredentials
+        string attachmentUrl
     }
     
     milestones {
@@ -183,8 +213,37 @@ erDiagram
         string status
         timestamp createdAt
     }
-```
 
+    task_contributors {
+        string id PK
+        string taskId FK
+        string developerId FK
+        integer individualProgress
+        boolean isCurrentActive
+        timestamp joinedAt
+    }
+
+    task_activities {
+        string id PK
+        string taskId FK
+        string triggeredById FK
+        string targetUserId FK
+        string activityType "assign | progress_update | blocker_reported | handover_notice | blocker_notice"
+        string note
+        timestamp createdAt
+    }
+
+    notifications {
+        string id PK
+        string recipientId FK
+        string senderId FK
+        string taskId FK
+        string title
+        string message
+        boolean isRead
+        timestamp createdAt
+    }
+```
 </details>
 
 <details>
@@ -194,34 +253,30 @@ erDiagram
 erp-pm-system/
 ├── _scripts/                  # Script seeding, migrasi, dan pengujian QA otomatis (Python & TS)
 │   ├── assign-tasks-by-role.ts # Otomasi distribusi tugas ke tim developer
-│   ├── seed-tasks.ts          # Seeding 55 tugas workbook ERP baru
-│   ├── seed-test-cases.ts     # Seeding 87 skenario uji QA matriks
+│   ├── seed-tasks.ts          # Seeding tugas workbook ERP dari dokumen kebutuhan
+│   ├── seed-test-cases.ts     # Seeding skenario uji QA matriks
 │   ├── run_e2e_qa_test.py     # Selenium E2E test untuk sistem PM lokal
 │   ├── test_erp_portal.py     # Selenium E2E test untuk Portal Staging ERP
+│   ├── wa-gateway.ts          # Klien otomatisasi WhatsApp Web gateway (Express)
 │   └── migrate.ts             # Script inisialisasi & migrasi database Drizzle
 ├── scratch/                   # Script penunjang/analitis sementara
 ├── src/
 │   ├── app/
 │   │   ├── (auth)/            # Routing Halaman Login & Sign-in
-│   │   ├── (dashboard)/       # Routing Halaman Utama & Modul (Terproteksi)
-│   │   │   ├── dashboard/     # Statistik S-Curve, Grafik S-Curve Recharts
-│   │   │   ├── projects/      # Manajemen CRUD Proyek & Milestone
-│   │   │   ├── tasks/         # Kanban Board & Form Editor Tugas
-│   │   │   ├── qa/            # Console Eksekusi Pengujian & Laporan PDF
-│   │   │   └── users/         # Pengaturan Akun & Manajemen Anggota Tim
-│   │   ├── api/               # Endpoint internal (sync sheets, mock-erp, stats)
+│   │   ├── (dashboard)/       # Layout dashboard terproteksi
+│   │   │   └── [projectCode]/ # Perutean dinamis per proyek (Dashboard, Tasks, QA, dll.)
+│   │   ├── api/               # Endpoint internal (sync sheets, mock-erp, stats, WA notify)
 │   │   ├── globals.css        # Konfigurasi CSS Tailwind & Tema UI
 │   │   └── layout.tsx         # Layout HTML & Context Provider utama
 │   ├── components/            # Komponen UI Reusable (Dialog, Card, Sidebar, dll.)
 │   ├── db/
-│   │   ├── index.ts           # Instance koneksi Better-SQLite3
-│   │   └── schema.ts          # Skema database relasional (Drizzle ORM)
+│   │   ├── index.ts           # Instance koneksi database PostgreSQL (drizzle client)
+│   │   └── schema.ts          # Skema database relasional PostgreSQL (Drizzle ORM)
 │   ├── lib/
 │   │   ├── google-sheets.ts   # Integrasi sinkronisasi API Google Sheets & Drive
 │   │   ├── s-curve.ts         # Algoritma kalkulasi target vs actual S-Curve
 │   │   └── export-utils.ts    # Helper untuk ekspor data PDF dan spreadsheet
 │   └── auth.ts                # Konfigurasi NextAuth JWT token
-├── erp_pm.db                  # Database SQLite lokal
 ├── drizzle.config.ts          # Konfigurasi workspace Drizzle Kit
 ├── package.json               # Dependensi & script eksekusi project
 └── README.md                  # Dokumentasi teknis proyek
@@ -234,6 +289,7 @@ erp-pm-system/
 
 ### 1. Prasyarat Sistem
 *   **Node.js**: Versi `20.x` ke atas (Direkomendasikan Node LTS).
+*   **PostgreSQL**: Server PostgreSQL aktif.
 *   **Python**: Versi `3.9` ke atas (Dibutuhkan jika ingin menjalankan skrip otomatisasi Selenium).
 *   **Web Browser**: Microsoft Edge (Selenium dikonfigurasi menggunakan `webdriver.Edge()`).
 
@@ -252,8 +308,8 @@ pip install selenium argparse
 Salin berkas `.env.local.example` menjadi `.env.local` pada direktori root, lalu sesuaikan isinya:
 
 ```env
-# Database Path
-DATABASE_URL="file:./erp_pm.db"
+# Database Connection String (PostgreSQL)
+DATABASE_URL="postgresql://postgres:password@localhost:5432/erp_pm_db"
 
 # NextAuth Configuration
 NEXTAUTH_SECRET="buat-secret-key-acak-anda-di-sini-minimal-32-karakter"
@@ -263,19 +319,22 @@ NEXTAUTH_URL="http://localhost:3000"
 GOOGLE_SERVICE_ACCOUNT_EMAIL="your-service-account@your-project.iam.gserviceaccount.com"
 GOOGLE_PRIVATE_KEY="-----BEGIN PRIVATE KEY-----\n...\n-----END PRIVATE KEY-----\n"
 GOOGLE_SPREADSHEET_ID="id-spreadsheet-laporan-anda"
+
+# WhatsApp Web Gateway Configuration
+WA_GATEWAY_API_KEY="api-key-gateway-aman-anda"
 ```
 
 ### 4. Setup Database & Seeding Awal
-Inisialisasi tabel basis data SQLite serta lakukan injeksi data bawaan (Users, Tasks, Test Cases):
+Inisialisasi tabel basis data PostgreSQL serta lakukan injeksi data bawaan (Users, Tasks, Test Cases):
 
 ```bash
-# Menjalankan migrasi skema tabel Drizzle
+# Menjalankan migrasi skema tabel Drizzle ke PostgreSQL
 npm run db:migrate
 
-# Mengisi data default user, tugas workbook (242 tugas), dan matriks tes (306 test cases)
+# Mengisi data default user, tugas workbook, dan matriks tes
 npm run db:seed
 
-# Memverifikasi integritas data yang telah masuk ke database lokal
+# Memverifikasi integritas data yang telah masuk ke database
 npm run db:verify
 ```
 
@@ -285,6 +344,14 @@ Jalankan server Next.js lokal pada port `3000`:
 ```bash
 npm run dev
 ```
+
+### 6. Menjalankan WhatsApp Bot Gateway (Terminal Terpisah)
+Jalankan server gateway API untuk WhatsApp Web agar pengiriman pesan notifikasi otomatis berjalan:
+```bash
+npm run wa:gateway
+```
+Pindai kode QR yang muncul di terminal menggunakan fitur "Perangkat Tertaut" pada aplikasi WhatsApp ponsel Anda. 
+
 Buka peramban (browser) Anda dan akses halaman `http://localhost:3000`.
 
 </details>

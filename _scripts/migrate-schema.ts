@@ -26,7 +26,7 @@ async function runSchemaMigration() {
       await db.execute(sql`
         ALTER TABLE "projects" ADD CONSTRAINT "projects_code_unique" UNIQUE ("code");
       `);
-    } catch (e: any) {
+    } catch (e: unknown) {
       console.log("Unique constraint 'projects_code_unique' already exists or failed to create. skipping.");
     }
 

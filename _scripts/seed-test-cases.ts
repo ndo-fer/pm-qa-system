@@ -111,7 +111,7 @@ const CREDENTIALS = {
 function generateTestSteps(
   featureName: string,
   role: "administrator" | "top_user" | "user",
-  roleFeatures: any
+  roleFeatures: { features?: string[]; description?: string } | undefined
 ): { testSteps: string[]; expectedResult: string } {
   const features = roleFeatures?.features || [];
   const description = roleFeatures?.description || "";

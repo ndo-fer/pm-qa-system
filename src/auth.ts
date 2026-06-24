@@ -12,6 +12,7 @@ declare module "next-auth" {
       projectId: string;
       projectCode: string;
       role: string;
+      permissions?: string[] | null;
       email: string;
       name?: string;
     }
@@ -21,6 +22,7 @@ declare module "next-auth" {
     projectId: string;
     projectCode: string;
     role: string;
+    permissions?: string[] | null;
     email: string;
     name?: string;
   }
@@ -32,6 +34,7 @@ declare module "next-auth/jwt" {
     projectId: string;
     projectCode: string;
     role: string;
+    permissions?: string[] | null;
   }
 }
 
@@ -88,6 +91,7 @@ export const authOptions: NextAuthOptions = {
           name: user[0].name,
           email: user[0].email,
           role: member[0].role,
+          permissions: user[0].permissions,
           projectId: project[0].id,
           projectCode: project[0].code,
         };
@@ -106,6 +110,7 @@ export const authOptions: NextAuthOptions = {
       if (user) {
         token.id = user.id;
         token.role = user.role;
+        token.permissions = user.permissions;
         token.projectId = user.projectId;
         token.projectCode = user.projectCode;
       }
@@ -123,6 +128,7 @@ export const authOptions: NextAuthOptions = {
       if (session.user) {
         session.user.id = token.id as string;
         session.user.role = token.role as string;
+        session.user.permissions = token.permissions as string[] | null | undefined;
         session.user.projectId = token.projectId as string;
         session.user.projectCode = token.projectCode as string;
       }

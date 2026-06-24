@@ -5,6 +5,7 @@ import { db } from "@/db";
 import { notifications, taskActivities, tasks, users } from "@/db/schema";
 import { eq, and, desc, inArray } from "drizzle-orm";
 import { sendWhatsAppNotification, formatTaskHandover, formatBlockerAlert } from "@/lib/wa";
+import { NotificationService } from "@/lib/notification-service";
 import { z } from "zod";
 
 const paramSchema = z.string().min(1);
@@ -85,15 +86,21 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     }
     const task = taskDetails[0];
 
-    // 4. Batch-resolve sender and target user names in a single query
+    // 4. Batch-resolve sender and target user names & phones in a single query
     const userIds = [notification.senderId, targetUserId].filter(Boolean) as string[];
     const resolvedUsers = await db
-      .select({ id: users.id, name: users.name })
+      .select({ id: users.id, name: users.name, phone: users.phone })
       .from(users)
       .where(inArray(users.id, userIds));
+
+    const targetUser = resolvedUsers.find((u) => u.id === targetUserId);
+    if (!targetUser || !targetUser.phone) {
+      return NextResponse.json({ error: "Gagal: Developer tujuan tidak memiliki nomor telepon terdaftar." }, { status: 400 });
+    }
+
     const userMap = new Map(resolvedUsers.map((u) => [u.id, u.name]));
     const senderName = userMap.get(notification.senderId) ?? "Seseorang";
-    const targetName = userMap.get(targetUserId) ?? "Rekan";
+    const targetName = targetUser.name ?? "Rekan";
 
     // 5. Susun Pesan Berdasarkan Jenis Notice (Handover atau Blocker)
     let waMessage = "";
@@ -123,14 +130,23 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
       });
     }
 
-    // 6. Kirim WhatsApp menggunakan gateway lokal
-    const success = await sendWhatsAppNotification({
+    // 6. Kirim WhatsApp menggunakan gateway lokal dengan audit logging & throttle check
+    const isThrottled = await NotificationService.isThrottled(notification.taskId, targetUserId);
+    if (isThrottled) {
+      return NextResponse.json({ error: "Pesan dibatasi: Notifikasi serupa sudah dikirim baru-baru ini." }, { status: 429 });
+    }
+
+    const { success, reason } = await NotificationService.sendWhatsAppWithAudit({
       recipientId: targetUserId,
       message: waMessage,
+      notificationId: notification.id,
     });
 
     if (!success) {
-      return NextResponse.json({ error: "Gagal mengirim pesan WhatsApp via Gateway lokal." }, { status: 502 });
+      if (reason === "gateway_failure" || reason === "connection_error") {
+        return NextResponse.json({ error: "Gateway WhatsApp tidak merespons atau offline." }, { status: 502 });
+      }
+      return NextResponse.json({ error: "Gagal mengirim pesan WhatsApp." }, { status: 502 });
     }
 
     // 7. Perbarui judul dan pesan notifikasi in-app agar Admin mengetahui status pengiriman (dan menghindari double-click)

@@ -1,7 +1,7 @@
 /* eslint-disable react-hooks/set-state-in-effect */
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { AppLayout } from "@/components/layout/app-layout";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -23,14 +23,17 @@ import {
 } from "@/components/ui/select";
 import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
-import { Plus, Pencil, Trash2 } from "lucide-react";
+import { Plus, Pencil, Trash2, RotateCcw } from "lucide-react";
 import { ExportButton } from "@/components/ui/export-button";
+import { PERMISSIONS, ROLE_DEFAULT_PERMISSIONS } from "@/lib/permissions";
+import { Checkbox } from "@/components/ui/checkbox";
 
 interface User {
   id: string;
   name: string;
   email: string;
   role: string;
+  permissions?: string[] | null;
   createdAt: string;
 }
 
@@ -71,9 +74,31 @@ export default function UsersPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [role, setRole] = useState("developer");
+  const [permissionsOverride, setPermissionsOverride] = useState<string[] | null>(null);
+
+  const activePermissions = permissionsOverride !== null 
+    ? permissionsOverride 
+    : (ROLE_DEFAULT_PERMISSIONS[role] || []);
+
+  const handlePermissionToggle = (perm: string) => {
+    const current = permissionsOverride !== null 
+      ? permissionsOverride 
+      : [...(ROLE_DEFAULT_PERMISSIONS[role] || [])];
+      
+    if (current.includes(perm)) {
+      setPermissionsOverride(current.filter((p) => p !== perm));
+    } else {
+      setPermissionsOverride([...current, perm]);
+    }
+  };
+
+  const isFirstLoad = useRef(true);
 
   async function fetchData() {
-    setLoading(true);
+    if (isFirstLoad.current) {
+      setLoading(true);
+      isFirstLoad.current = false;
+    }
     const res = await fetch("/api/users");
     if (res.ok) setUsers(await res.json());
     setLoading(false);
@@ -92,9 +117,10 @@ export default function UsersPage() {
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     const method = editingUser ? "PUT" : "POST";
-    const body: { name: string; email: string; role: string; password?: string; id?: string } = { name, email, role };
+    const body: { name: string; email: string; role: string; password?: string; id?: string; permissions?: string[] | null } = { name, email, role };
     if (password) body.password = password;
     if (editingUser) body.id = editingUser.id;
+    body.permissions = permissionsOverride;
 
     await fetch("/api/users", {
       method,
@@ -106,6 +132,7 @@ export default function UsersPage() {
     setEmail("");
     setPassword("");
     setRole("developer");
+    setPermissionsOverride(null);
     setShowForm(false);
     setEditingUser(null);
     fetchData();
@@ -127,6 +154,7 @@ export default function UsersPage() {
     setEmail(user.email);
     setPassword("");
     setRole(user.role);
+    setPermissionsOverride(user.permissions || null);
     setShowForm(true);
   }
 
@@ -162,7 +190,7 @@ export default function UsersPage() {
           </div>
           <div className="flex items-center gap-2">
             <ExportButton data={users} filename="users_list" />
-            <Button onClick={() => { setEditingUser(null); setName(""); setEmail(""); setPassword(""); setRole("developer"); setShowForm(true); }}>
+            <Button onClick={() => { setEditingUser(null); setName(""); setEmail(""); setPassword(""); setRole("developer"); setPermissionsOverride(null); setShowForm(true); }}>
               <Plus className="w-4 h-4 mr-2" />
               New User
             </Button>
@@ -186,6 +214,41 @@ export default function UsersPage() {
                 </SelectContent>
               </Select>
             </div>
+
+            <div className="space-y-3 pt-2">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h4 className="text-sm font-semibold">Custom Permissions</h4>
+                  <p className="text-xs text-gray-500">
+                    By default, permissions follow the selected role. Checking or unchecking boxes will override the default permissions for this specific user.
+                  </p>
+                </div>
+                {permissionsOverride !== null && (
+                  <Button type="button" variant="ghost" size="sm" onClick={() => setPermissionsOverride(null)} className="h-8 text-xs text-orange-600">
+                    <RotateCcw className="w-3 h-3 mr-1" />
+                    Reset to Default
+                  </Button>
+                )}
+              </div>
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-3 bg-gray-50 p-4 rounded-md border">
+                {PERMISSIONS.map((perm) => (
+                  <div key={perm} className="flex items-center space-x-2">
+                    <Checkbox
+                      id={`perm-${perm}`}
+                      checked={activePermissions.includes(perm)}
+                      onCheckedChange={() => handlePermissionToggle(perm)}
+                    />
+                    <label
+                      htmlFor={`perm-${perm}`}
+                      className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+                    >
+                      {perm}
+                    </label>
+                  </div>
+                ))}
+              </div>
+            </div>
+
             <div className="flex gap-2">
               <Button type="submit">{editingUser ? "Update" : "Create"}</Button>
               <Button type="button" variant="outline" onClick={() => { setShowForm(false); setEditingUser(null); }}>Cancel</Button>

@@ -242,8 +242,9 @@ async function main() {
         }
       }
     }
-  } catch (err: any) {
-    console.error("❌ Failed to synchronize with Google Sheets:", err.message || err);
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : String(err);
+    console.error("❌ Failed to synchronize with Google Sheets:", msg);
   }
 
   console.log("\n=== AUTO-ASSIGNMENT COMPLETED SUCCESSFULLY ===");

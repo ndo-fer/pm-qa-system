@@ -34,8 +34,9 @@ async function run() {
     const result = await syncGoogleSheets({ scope: "all" });
     console.log("Sync completed successfully!");
     console.log(JSON.stringify(result, null, 2));
-  } catch (error: any) {
-    console.error("Sync failed:", error.message || error);
+  } catch (error: unknown) {
+    const msg = error instanceof Error ? error.message : String(error);
+    console.error("Sync failed:", msg);
     process.exit(1);
   }
 }

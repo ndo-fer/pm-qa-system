@@ -6,6 +6,7 @@ export const users = pgTable("users", {
   email: text("email").notNull().unique(),
   passwordHash: text("password_hash").notNull(),
   role: text("role").$type<"admin" | "pm" | "developer" | "qa">().notNull(),
+  permissions: jsonb("permissions").$type<string[]>(),
   phone: text("phone"),
   createdAt: timestamp("created_at", { mode: "string" }).defaultNow(),
 });
@@ -40,6 +41,7 @@ export const tasks = pgTable("tasks", {
   status: text("status").$type<"todo" | "in_progress" | "review" | "done">().notNull().default("todo"),
   priority: text("priority").$type<"low" | "medium" | "high" | "urgent">().notNull().default("medium"),
   dueDate: text("due_date"),
+  startDate: text("start_date"),
   createdAt: timestamp("created_at", { mode: "string" }).defaultNow(),
   updatedAt: timestamp("updated_at", { mode: "string" }).defaultNow(),
   // Developer workbook fields
@@ -134,6 +136,14 @@ export const notifications = pgTable("notifications", {
   createdAt: timestamp("created_at", { mode: "string" }).defaultNow(),
 });
 
+export const passwordResets = pgTable("password_resets", {
+  id: text("id").primaryKey(),
+  userId: text("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  token: text("token").notNull().unique(),
+  expiresAt: timestamp("expires_at", { mode: "string" }).notNull(),
+  createdAt: timestamp("created_at", { mode: "string" }).defaultNow(),
+});
+
 export type Milestone = typeof milestones.$inferSelect;
 export type NewMilestone = typeof milestones.$inferInsert;
 
@@ -155,6 +165,20 @@ export type TaskActivity = typeof taskActivities.$inferSelect;
 export type NewTaskActivity = typeof taskActivities.$inferInsert;
 export type Notification = typeof notifications.$inferSelect;
 export type NewNotification = typeof notifications.$inferInsert;
+export type PasswordReset = typeof passwordResets.$inferSelect;
+export type NewPasswordReset = typeof passwordResets.$inferInsert;
+
+export const notificationDispatches = pgTable("notification_dispatches", {
+  id: text("id").primaryKey(),
+  notificationId: text("notification_id").references(() => notifications.id, { onDelete: "cascade" }),
+  channel: text("channel").$type<"in_app" | "whatsapp" | "email">().notNull(),
+  status: text("status").$type<"pending" | "sent" | "failed">().notNull(),
+  errorMessage: text("error_message"),
+  sentAt: timestamp("sent_at", { mode: "string" }).defaultNow(),
+});
+
+export type NotificationDispatch = typeof notificationDispatches.$inferSelect;
+export type NewNotificationDispatch = typeof notificationDispatches.$inferInsert;
 
 
 // ERP role-based types

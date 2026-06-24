@@ -4,7 +4,7 @@ import { useState } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Pencil, ArrowLeft, ArrowRight, AlertTriangle, Archive, ArchiveRestore, Image } from "lucide-react";
+import { Pencil, ArrowLeft, ArrowRight, AlertTriangle, Archive, ArchiveRestore, Image, GripVertical } from "lucide-react";
 
 interface Task {
   id: string;
@@ -41,122 +41,107 @@ interface KanbanBoardProps {
 }
 
 const COLUMNS = [
-  { 
-    id: "todo", 
-    title: "To Do", 
-    bg: "bg-slate-50/70", 
-    border: "border-slate-200", 
-    text: "text-slate-800",
-    headerBg: "bg-slate-100",
-    borderTop: "border-t-4 border-t-slate-500",
-    badgeBg: "bg-slate-200 text-slate-800"
+  {
+    id: "todo",
+    title: "To Do",
+    accentColor: "bg-slate-500",
+    colBg: "bg-slate-50/60",
+    border: "border-slate-200",
+    headerText: "text-slate-700",
+    badgeBg: "bg-slate-200/80 text-slate-700",
+    emptyIcon: "text-slate-300",
   },
-  { 
-    id: "in_progress", 
-    title: "In Progress", 
-    bg: "bg-sky-50/40", 
-    border: "border-sky-100", 
-    text: "text-sky-900",
-    headerBg: "bg-sky-100/70",
-    borderTop: "border-t-4 border-t-sky-500",
-    badgeBg: "bg-sky-200 text-sky-800"
+  {
+    id: "in_progress",
+    title: "In Progress",
+    accentColor: "bg-blue-500",
+    colBg: "bg-blue-50/40",
+    border: "border-blue-200/60",
+    headerText: "text-blue-800",
+    badgeBg: "bg-blue-100 text-blue-700",
+    emptyIcon: "text-blue-200",
   },
-  { 
-    id: "review", 
-    title: "Review", 
-    bg: "bg-amber-50/40", 
-    border: "border-amber-100", 
-    text: "text-amber-900",
-    headerBg: "bg-amber-100/70",
-    borderTop: "border-t-4 border-t-amber-500",
-    badgeBg: "bg-amber-200 text-amber-800"
+  {
+    id: "review",
+    title: "Review",
+    accentColor: "bg-amber-400",
+    colBg: "bg-amber-50/40",
+    border: "border-amber-200/60",
+    headerText: "text-amber-800",
+    badgeBg: "bg-amber-100 text-amber-700",
+    emptyIcon: "text-amber-200",
   },
-  { 
-    id: "done", 
-    title: "Done", 
-    bg: "bg-emerald-50/40", 
-    border: "border-emerald-100", 
-    text: "text-emerald-900",
-    headerBg: "bg-emerald-100/70",
-    borderTop: "border-t-4 border-t-emerald-500",
-    badgeBg: "bg-emerald-200 text-emerald-850"
+  {
+    id: "done",
+    title: "Done",
+    accentColor: "bg-emerald-500",
+    colBg: "bg-emerald-50/40",
+    border: "border-emerald-200/60",
+    headerText: "text-emerald-800",
+    badgeBg: "bg-emerald-100 text-emerald-700",
+    emptyIcon: "text-emerald-200",
   },
 ];
 
-const renderAvatars = (contributors: any[] = []) => {
-  if (contributors.length === 0) return null;
-  
-  const sorted = [...contributors].sort((a, b) => {
-    if (a.isCurrentActive && !b.isCurrentActive) return -1;
-    if (!a.isCurrentActive && b.isCurrentActive) return 1;
-    return 0;
-  });
+const PRIORITY_CONFIG: Record<string, { bar: string; badge: string; label: string }> = {
+  urgent: { bar: "bg-rose-500",   badge: "bg-rose-100 text-rose-700 border-rose-200",   label: "Urgent"  },
+  high:   { bar: "bg-amber-500",  badge: "bg-amber-100 text-amber-700 border-amber-200", label: "High"    },
+  medium: { bar: "bg-blue-400",   badge: "bg-blue-100 text-blue-700 border-blue-200",    label: "Medium"  },
+  low:    { bar: "bg-slate-300",  badge: "bg-slate-100 text-slate-600 border-slate-200", label: "Low"     },
+};
 
-  const displayed = sorted.slice(0, 2);
-  const remainingCount = sorted.length - displayed.length;
+function getInitials(name: string): string {
+  if (!name) return "";
+  const parts = name.trim().split(/\s+/);
+  if (parts.length >= 2) return (parts[0][0] + parts[1][0]).toUpperCase();
+  return name.substring(0, 2).toUpperCase();
+}
 
-  const getInitials = (name: string) => {
-    if (!name) return "";
-    const parts = name.trim().split(/\s+/);
-    if (parts.length >= 2) {
-      return (parts[0][0] + parts[1][0]).toUpperCase();
-    }
-    return name.substring(0, 2).toUpperCase();
-  };
+function AvatarStack({ contributors = [] }: { contributors?: Task["contributors"] }) {
+  if (!contributors || contributors.length === 0) return null;
+  const sorted = [...contributors].sort((a, b) => (a.isCurrentActive === b.isCurrentActive ? 0 : a.isCurrentActive ? -1 : 1));
+  const displayed = sorted.slice(0, 3);
+  const remaining = sorted.length - displayed.length;
 
   return (
-    <div className="flex items-center -space-x-1.5 overflow-hidden select-none">
-      {displayed.map((c) => {
-        const initials = getInitials(c.name);
-        return (
-          <div
-            key={c.developerId}
-            title={`${c.name} (${c.role})${c.isCurrentActive ? ' - Active' : ''} - Progress: ${c.individualProgress}%`}
-            className={`w-5 h-5 rounded-full flex items-center justify-center text-[9px] font-black text-white border shadow-sm ${
-              c.isCurrentActive 
-                ? "bg-blue-600 border-blue-200" 
-                : "bg-slate-400 border-white"
-            }`}
-          >
-            {initials}
-          </div>
-        );
-      })}
-      {remainingCount > 0 && (
+    <div className="flex items-center -space-x-1.5">
+      {displayed.map((c) => (
         <div
-          title={`+${remainingCount} other contributors`}
-          className="w-5 h-5 rounded-full bg-slate-200 border border-white flex items-center justify-center text-[8px] font-black text-slate-650"
+          key={c.developerId}
+          title={`${c.name} — ${c.role}${c.isCurrentActive ? " (active)" : ""} · ${c.individualProgress}%`}
+          className={`w-5 h-5 rounded-full flex items-center justify-center text-[8px] font-black text-white border-[1.5px] border-white shadow-sm flex-shrink-0 ${
+            c.isCurrentActive ? "bg-blue-500" : "bg-slate-400"
+          }`}
         >
-          +{remainingCount}
+          {getInitials(c.name)}
+        </div>
+      ))}
+      {remaining > 0 && (
+        <div className="w-5 h-5 rounded-full bg-slate-200 border-[1.5px] border-white flex items-center justify-center text-[8px] font-bold text-slate-600 shadow-sm">
+          +{remaining}
         </div>
       )}
     </div>
   );
-};
+}
 
 export function KanbanBoard({ tasks, onEdit, onPreview, onRefresh }: KanbanBoardProps) {
   const [updatingId, setUpdatingId] = useState<string | null>(null);
   const [draggedOverCol, setDraggedOverCol] = useState<string | null>(null);
   const [columnLimits, setColumnLimits] = useState<Record<string, number>>({
-    todo: 10,
-    in_progress: 10,
-    review: 10,
-    done: 10,
+    todo: 10, in_progress: 10, review: 10, done: 10,
   });
 
   async function handleToggleArchive(task: Task) {
-    const isTaskArchived = task.isArchived === 1 || task.isArchived === true;
+    const isArchived = task.isArchived === 1 || task.isArchived === true;
     setUpdatingId(task.id);
     try {
       const res = await fetch(`/api/tasks/${task.id}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ isArchived: isTaskArchived ? 0 : 1 }),
+        body: JSON.stringify({ isArchived: isArchived ? 0 : 1 }),
       });
-
-      if (res.ok) {
-        onRefresh();
-      }
+      if (res.ok) onRefresh();
     } catch (err) {
       console.error("Failed to toggle archive", err);
     } finally {
@@ -165,29 +150,17 @@ export function KanbanBoard({ tasks, onEdit, onPreview, onRefresh }: KanbanBoard
   }
 
   async function handleMove(task: Task, direction: "left" | "right") {
-    const statusOrder = ["todo", "in_progress", "review", "done"];
-    const currentIndex = statusOrder.indexOf(task.status);
-    let nextIndex = currentIndex;
+    const order = ["todo", "in_progress", "review", "done"];
+    const idx = order.indexOf(task.status);
+    const nextIdx = direction === "left" ? idx - 1 : idx + 1;
+    if (nextIdx < 0 || nextIdx >= order.length) return;
+    const nextStatus = order[nextIdx];
 
-    if (direction === "left" && currentIndex > 0) {
-      nextIndex = currentIndex - 1;
-    } else if (direction === "right" && currentIndex < statusOrder.length - 1) {
-      nextIndex = currentIndex + 1;
-    }
-
-    if (nextIndex === currentIndex) return;
-    const nextStatus = statusOrder[nextIndex];
-
-    let nextProgress = task.progress;
-    if (nextStatus === "todo") {
-      nextProgress = 0;
-    } else if (nextStatus === "review") {
-      nextProgress = 90;
-    } else if (nextStatus === "done") {
-      nextProgress = 100;
-    } else if (nextStatus === "in_progress") {
-      nextProgress = Math.min(task.progress || 0, 90);
-    }
+    const progressMap: Record<string, number> = { todo: 0, review: 90, done: 100 };
+    const nextProgress =
+      nextStatus === "in_progress"
+        ? Math.min(task.progress || 0, 89)
+        : progressMap[nextStatus] ?? task.progress;
 
     setUpdatingId(task.id);
     try {
@@ -196,10 +169,7 @@ export function KanbanBoard({ tasks, onEdit, onPreview, onRefresh }: KanbanBoard
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ status: nextStatus, progress: nextProgress }),
       });
-
-      if (res.ok) {
-        onRefresh();
-      }
+      if (res.ok) onRefresh();
     } catch (err) {
       console.error("Failed to update status", err);
     } finally {
@@ -207,21 +177,9 @@ export function KanbanBoard({ tasks, onEdit, onPreview, onRefresh }: KanbanBoard
     }
   }
 
-  // Drag and Drop Handlers
   const handleDragStart = (e: React.DragEvent, taskId: string) => {
     e.dataTransfer.setData("text/plain", taskId);
     e.dataTransfer.effectAllowed = "move";
-  };
-
-  const handleDragOver = (e: React.DragEvent, colId: string) => {
-    e.preventDefault();
-    if (draggedOverCol !== colId) {
-      setDraggedOverCol(colId);
-    }
-  };
-
-  const handleDragLeave = () => {
-    setDraggedOverCol(null);
   };
 
   const handleDrop = async (e: React.DragEvent, targetStatus: string) => {
@@ -229,20 +187,14 @@ export function KanbanBoard({ tasks, onEdit, onPreview, onRefresh }: KanbanBoard
     setDraggedOverCol(null);
     const taskId = e.dataTransfer.getData("text/plain");
     if (!taskId) return;
-
     const task = tasks.find((t) => t.id === taskId);
     if (!task || task.status === targetStatus) return;
 
-    let nextProgress = task.progress;
-    if (targetStatus === "todo") {
-      nextProgress = 0;
-    } else if (targetStatus === "review") {
-      nextProgress = 90;
-    } else if (targetStatus === "done") {
-      nextProgress = 100;
-    } else if (targetStatus === "in_progress") {
-      nextProgress = Math.min(task.progress || 0, 90);
-    }
+    const progressMap: Record<string, number> = { todo: 0, review: 90, done: 100 };
+    const nextProgress =
+      targetStatus === "in_progress"
+        ? Math.min(task.progress || 0, 89)
+        : progressMap[targetStatus] ?? task.progress;
 
     setUpdatingId(taskId);
     try {
@@ -251,10 +203,7 @@ export function KanbanBoard({ tasks, onEdit, onPreview, onRefresh }: KanbanBoard
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ status: targetStatus, progress: nextProgress }),
       });
-
-      if (res.ok) {
-        onRefresh();
-      }
+      if (res.ok) onRefresh();
     } catch (err) {
       console.error("Failed to update status", err);
     } finally {
@@ -263,206 +212,195 @@ export function KanbanBoard({ tasks, onEdit, onPreview, onRefresh }: KanbanBoard
   };
 
   return (
-    <div className="flex flex-row gap-2.5 h-full w-full overflow-x-auto overflow-y-hidden pb-1 min-h-0 scrollbar-thin select-none">
+    <div
+      className="flex flex-row gap-3 w-full overflow-x-auto overflow-y-hidden pb-1 select-none"
+      style={{ height: "calc(100vh - 210px)" }}
+    >
       {COLUMNS.map((col) => {
         const colTasks = tasks.filter((t) => t.status === col.id);
         const limit = columnLimits[col.id] || 10;
         const visibleTasks = colTasks.slice(0, limit);
-        const isHovered = draggedOverCol === col.id;
+        const isOver = draggedOverCol === col.id;
 
         return (
-          <div 
-            key={col.id} 
-            className={`flex flex-col rounded-xl border-2 p-1.5 min-w-[280px] max-w-[480px] flex-1 w-full max-h-full shadow-sm transition-all duration-200 ${
-              isHovered 
-                ? "bg-slate-100/95 border-blue-400 border-dashed ring-2 ring-blue-400/10 scale-[1.005]" 
-                : `${col.border} ${col.bg}`
-            } ${col.borderTop}`}
-            onDragOver={(e) => handleDragOver(e, col.id)}
-            onDragLeave={handleDragLeave}
+          <div
+            key={col.id}
+            className={`flex flex-col rounded-2xl border min-w-[272px] flex-1 max-h-full transition-all duration-200 ${
+              isOver
+                ? "border-blue-400 border-dashed bg-blue-50/60 shadow-lg shadow-blue-100/40"
+                : `${col.border} ${col.colBg}`
+            }`}
+            onDragOver={(e) => { e.preventDefault(); if (draggedOverCol !== col.id) setDraggedOverCol(col.id); }}
+            onDragLeave={() => setDraggedOverCol(null)}
             onDrop={(e) => handleDrop(e, col.id)}
           >
+            {/* Column accent bar */}
+            <div className={`${col.accentColor} h-1 rounded-t-2xl flex-shrink-0`} />
+
             {/* Column Header */}
-            <div className={`flex items-center justify-between p-1.5 rounded-t-lg ${col.headerBg} border-b border-slate-200/60 mb-2`}>
-              <div className="flex items-center gap-2">
-                <span className={`font-bold text-xs uppercase tracking-wider ${col.text}`}>{col.title}</span>
-                <Badge className={`font-mono text-[10px] font-bold ${col.badgeBg} border-none`}>{colTasks.length}</Badge>
-              </div>
+            <div className="flex items-center justify-between px-3.5 py-2.5 flex-shrink-0">
+              <span className={`text-xs font-bold uppercase tracking-widest ${col.headerText}`}>
+                {col.title}
+              </span>
+              <span className={`text-[11px] font-bold px-2 py-0.5 rounded-full ${col.badgeBg}`}>
+                {colTasks.length}
+              </span>
             </div>
 
-            {/* Tasks Container */}
-            <div className="flex-1 overflow-y-auto space-y-1.5 pr-1 scrollbar-thin min-h-0 pb-2">
+            {/* Task List */}
+            <div className="flex-1 overflow-y-auto px-2.5 pb-3 space-y-2 min-h-0 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
               {colTasks.length === 0 ? (
-                <div className="flex flex-col items-center justify-center h-20 border border-dashed rounded-lg bg-white/50 text-slate-400 text-xs">
-                  No tasks here
+                <div className="flex flex-col items-center justify-center h-28 rounded-xl border border-dashed border-slate-200 bg-white/50">
+                  <p className="text-xs text-slate-400 font-medium">No tasks here</p>
+                  <p className="text-[10px] text-slate-300 mt-0.5">Drag & drop to add</p>
                 </div>
               ) : (
                 <>
-                  {visibleTasks.map((task) => (
-                    <Card 
-                      key={task.id} 
-                      draggable
-                      onDragStart={(e) => handleDragStart(e, task.id)}
-                      onClick={() => onPreview(task)}
-                      className={`shadow-sm border-slate-200/80 hover:border-slate-350 hover:shadow-md transition-all bg-white group relative overflow-hidden cursor-pointer hover:scale-[1.01] active:scale-[0.99] duration-150 ${
-                        updatingId === task.id ? "opacity-50 pointer-events-none" : ""
-                      } ${
-                        task.priority === "urgent" ? "border-l-[3px] border-l-rose-500 shadow-rose-50/10" :
-                        task.priority === "high" ? "border-l-[3px] border-l-amber-500 shadow-amber-50/10" :
-                        task.priority === "medium" ? "border-l-[3px] border-l-sky-500 shadow-sky-50/10" :
-                        "border-l-[3px] border-l-slate-300"
-                      }`}
-                    >
-                      <CardContent className="p-2 space-y-1.5">
-                        {/* Compact Header: Code, Epic, Priority */}
-                        <div className="flex items-center justify-between gap-1.5">
-                          <div className="flex items-center gap-1.5">
-                            {task.taskCode && (
-                              <span className="font-mono text-[9px] text-slate-500 font-extrabold bg-slate-100 px-1.5 py-0.5 rounded border border-slate-200/30">
-                                {task.taskCode}
-                              </span>
-                            )}
-                            <span className="text-[9px] font-extrabold text-blue-700 uppercase bg-blue-50 px-1.5 py-0.5 rounded border border-blue-100/30">
-                              {task.epic || "-"}
-                            </span>
-                            {task.screenshotUrl ? (
-                              <span 
-                                title="Has screenshot references" 
-                                className="inline-flex items-center justify-center p-0.5 rounded bg-emerald-50 text-emerald-600 border border-emerald-200/30"
-                              >
-                                <Image className="w-3.5 h-3.5" />
-                              </span>
-                            ) : (
-                              <span 
-                                title="Missing screenshot reference" 
-                                className="inline-flex items-center justify-center p-0.5 rounded bg-slate-50 text-slate-400 border border-slate-200/30"
-                              >
-                                <Image className="w-3.5 h-3.5 opacity-40" />
-                              </span>
-                            )}
-                          </div>
-                          <Badge 
-                            variant="outline"
-                            className={`text-[9px] uppercase font-extrabold px-1.5 py-0 border-none rounded-sm ${
-                              task.priority === "urgent" ? "bg-red-100 text-red-700" :
-                              task.priority === "high" ? "bg-amber-100 text-amber-800" :
-                              task.priority === "medium" ? "bg-blue-100 text-blue-700" :
-                              "bg-slate-100 text-slate-600"
-                            }`}
-                          >
-                            {task.priority}
-                          </Badge>
-                        </div>
+                  {visibleTasks.map((task) => {
+                    const p = PRIORITY_CONFIG[task.priority] || PRIORITY_CONFIG.low;
+                    const isArchived = task.isArchived === 1 || task.isArchived === true;
+                    const isUpdating = updatingId === task.id;
 
-                        {/* Title */}
-                        <p className="text-xs font-semibold text-slate-800 line-clamp-2 leading-relaxed">
-                          {task.title}
-                        </p>
+                    return (
+                      <Card
+                        key={task.id}
+                        draggable
+                        onDragStart={(e) => handleDragStart(e, task.id)}
+                        onClick={() => onPreview(task)}
+                        className={`border border-slate-200/80 bg-white shadow-sm hover:shadow-md transition-all duration-150 cursor-pointer group relative overflow-hidden hover:-translate-y-0.5 ${
+                          isUpdating ? "opacity-50 pointer-events-none" : ""
+                        } ${isArchived ? "opacity-60" : ""}`}
+                      >
+                        {/* Priority accent */}
+                        <div className={`absolute left-0 top-0 bottom-0 w-[3px] ${p.bar} rounded-l-xl`} />
 
-                        {/* Blocker Alert */}
-                        {task.blocker && (
-                          <div className="flex items-start gap-1 text-[9px] text-red-600 bg-red-50 p-1.5 rounded border border-red-100/60 font-medium">
-                            <AlertTriangle className="w-3 h-3 flex-shrink-0 mt-0.5 text-red-500" />
-                            <span className="line-clamp-2">Blocker: {task.blocker}</span>
-                          </div>
-                        )}
-
-                        {/* Progress Bar (if In Progress or Review) */}
-                        {(task.status === "in_progress" || task.status === "review") && (
-                          <div className="space-y-1">
-                            <div className="flex justify-between text-[9px] text-slate-500 font-semibold">
-                              <span>Progress</span>
-                              <span>{task.progress}%</span>
-                            </div>
-                            <div className="w-full bg-slate-100 rounded-full h-1">
-                              <div 
-                                className="bg-blue-600 h-1 rounded-full transition-all" 
-                                style={{ width: `${task.progress}%` }}
-                              />
-                            </div>
-                          </div>
-                        )}
-
-                        {/* Compact Footer Actions */}
-                        <div className="flex items-center justify-between pt-1 border-t border-slate-50">
-                          <div className="flex items-center gap-1.5 overflow-hidden max-w-[150px]">
-                            {task.feature && (
-                              <span className="text-[10px] text-slate-450 truncate max-w-[80px] font-medium" title={task.feature}>
-                                {task.feature}
-                              </span>
-                            )}
-                            {renderAvatars(task.contributors)}
-                          </div>
-                          
-                          <div className="flex items-center gap-0.5 opacity-60 group-hover:opacity-100 transition-opacity">
-                            <Button 
-                              variant="ghost" 
-                              size="icon" 
-                              className="w-5 h-5 rounded hover:bg-slate-100"
-                              onClick={(e) => { e.stopPropagation(); onEdit(task); }}
-                              title="Edit Task"
-                            >
-                              <Pencil className="w-3 h-3 text-slate-500 hover:text-slate-800" />
-                            </Button>
-                            <Button 
-                              variant="ghost" 
-                              size="icon" 
-                              className="w-5 h-5 rounded hover:bg-slate-100"
-                              onClick={(e) => { e.stopPropagation(); handleToggleArchive(task); }}
-                              title={task.isArchived === 1 || task.isArchived === true ? "Restore Task" : "Archive Task"}
-                            >
-                              {(task.isArchived === 1 || task.isArchived === true) ? (
-                                <ArchiveRestore className="w-3 h-3 text-amber-600 hover:text-amber-800" />
-                              ) : (
-                                <Archive className="w-3 h-3 text-slate-500 hover:text-slate-800" />
+                        <CardContent className="pl-4 pr-2.5 pt-2 pb-2">
+                          {/* Top row: code + epic + screenshot + priority */}
+                          <div className="flex items-center justify-between gap-1 mb-1">
+                            <div className="flex items-center gap-1 min-w-0 flex-1">
+                              {task.taskCode && (
+                                <span className="font-mono text-[9px] font-bold text-slate-400 bg-slate-100 px-1.5 py-0.5 rounded flex-shrink-0">
+                                  {task.taskCode}
+                                </span>
                               )}
-                            </Button>
-                            <Button 
-                              variant="ghost" 
-                              size="icon" 
-                              className="w-5 h-5 rounded hover:bg-slate-100"
-                              disabled={task.status === "todo"}
-                              onClick={(e) => { e.stopPropagation(); handleMove(task, "left"); }}
-                              title="Move Left"
-                            >
-                              <ArrowLeft className="w-3 h-3 text-slate-500" />
-                            </Button>
-                            <Button 
-                              variant="ghost" 
-                              size="icon" 
-                              className="w-5 h-5 rounded hover:bg-slate-100"
-                              disabled={task.status === "done"}
-                              onClick={(e) => { e.stopPropagation(); handleMove(task, "right"); }}
-                              title="Move Right"
-                            >
-                              <ArrowRight className="w-3 h-3 text-slate-500" />
-                            </Button>
+                              {task.epic && (
+                                <span className="text-[9px] font-extrabold text-blue-600 uppercase bg-blue-50 px-1.5 py-0.5 rounded border border-blue-100/50 flex-shrink-0">
+                                  {task.epic}
+                                </span>
+                              )}
+                              <span
+                                title={task.screenshotUrl ? "Has screenshot" : "No screenshot"}
+                                className={`inline-flex items-center p-0.5 rounded flex-shrink-0 ${
+                                  task.screenshotUrl ? "text-emerald-500" : "text-slate-300"
+                                }`}
+                              >
+                                <Image className="w-3 h-3" />
+                              </span>
+                            </div>
+                            <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded border uppercase flex-shrink-0 ${p.badge}`}>
+                              {p.label}
+                            </span>
                           </div>
-                        </div>
-                      </CardContent>
-                    </Card>
-                  ))}
 
-                  {/* Column Pagination Controls */}
+                          {/* Title */}
+                          <p className="text-xs font-semibold text-slate-800 leading-snug line-clamp-2 mb-1">
+                            {task.title}
+                          </p>
+
+                          {/* Feature subtitle */}
+                          {task.feature && (
+                            <p className="text-[10px] text-slate-400 truncate mb-1 font-medium leading-none">
+                              {task.feature}
+                            </p>
+                          )}
+
+                          {/* Blocker */}
+                          {task.blocker && (
+                            <div className="flex items-start gap-1 bg-red-50 border border-red-100 rounded-md px-1.5 py-1 mb-1">
+                              <AlertTriangle className="w-3 h-3 text-red-400 flex-shrink-0 mt-px" />
+                              <span className="text-[9px] text-red-600 font-medium line-clamp-2 leading-tight">
+                                {task.blocker}
+                              </span>
+                            </div>
+                          )}
+
+                          {/* Progress bar */}
+                          {(task.status === "in_progress" || task.status === "review") && typeof task.progress === "number" && (
+                            <div className="mb-1">
+                              <div className="flex justify-between items-center mb-0.5">
+                                <span className="text-[9px] text-slate-400 font-semibold">Progress</span>
+                                <span className="text-[9px] text-slate-600 font-bold">{task.progress}%</span>
+                              </div>
+                              <div className="w-full bg-slate-100 rounded-full h-1 overflow-hidden">
+                                <div
+                                  className={`h-1 rounded-full transition-all duration-500 ${p.bar}`}
+                                  style={{ width: `${task.progress}%` }}
+                                />
+                              </div>
+                            </div>
+                          )}
+
+                          {/* Footer */}
+                          <div className="flex items-center justify-between pt-1 border-t border-slate-100 mt-1">
+                            <AvatarStack contributors={task.contributors} />
+
+                            {/* Actions - shown on hover */}
+                            <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity duration-150">
+                              <button
+                                className="w-5 h-5 rounded flex items-center justify-center text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors"
+                                onClick={(e) => { e.stopPropagation(); onEdit(task); }}
+                                title="Edit"
+                              >
+                                <Pencil className="w-2.5 h-2.5" />
+                              </button>
+                              <button
+                                className="w-5 h-5 rounded flex items-center justify-center text-slate-400 hover:text-amber-600 hover:bg-amber-50 transition-colors"
+                                onClick={(e) => { e.stopPropagation(); handleToggleArchive(task); }}
+                                title={isArchived ? "Restore" : "Archive"}
+                              >
+                                {isArchived
+                                  ? <ArchiveRestore className="w-2.5 h-2.5 text-amber-500" />
+                                  : <Archive className="w-2.5 h-2.5" />
+                                }
+                              </button>
+                              <button
+                                disabled={task.status === "todo"}
+                                className="w-5 h-5 rounded flex items-center justify-center text-slate-400 hover:text-blue-600 hover:bg-blue-50 transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+                                onClick={(e) => { e.stopPropagation(); handleMove(task, "left"); }}
+                                title="Move Left"
+                              >
+                                <ArrowLeft className="w-2.5 h-2.5" />
+                              </button>
+                              <button
+                                disabled={task.status === "done"}
+                                className="w-5 h-5 rounded flex items-center justify-center text-slate-400 hover:text-blue-600 hover:bg-blue-50 transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+                                onClick={(e) => { e.stopPropagation(); handleMove(task, "right"); }}
+                                title="Move Right"
+                              >
+                                <ArrowRight className="w-2.5 h-2.5" />
+                              </button>
+                            </div>
+                          </div>
+                        </CardContent>
+                      </Card>
+                    );
+                  })}
+
                   {colTasks.length > limit && (
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="w-full text-[11px] font-extrabold text-blue-600 hover:text-blue-700 py-2 mt-2 bg-blue-50/20 hover:bg-blue-50/50 border-dashed border-blue-200"
-                      onClick={() => setColumnLimits(prev => ({ ...prev, [col.id]: colTasks.length }))}
+                    <button
+                      className="w-full text-[11px] font-bold text-blue-600 hover:text-blue-700 py-2 rounded-xl bg-blue-50 hover:bg-blue-100 border border-dashed border-blue-200 transition-colors"
+                      onClick={() => setColumnLimits((p) => ({ ...p, [col.id]: colTasks.length }))}
                     >
-                      Load More (+{colTasks.length - limit} tasks)
-                    </Button>
+                      Load {colTasks.length - limit} more…
+                    </button>
                   )}
                   {limit > 10 && colTasks.length > 10 && (
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="w-full text-[11px] font-extrabold text-slate-500 hover:text-slate-700 py-1.5 hover:bg-slate-100 mt-2 border border-slate-200/40 rounded-lg"
-                      onClick={() => setColumnLimits(prev => ({ ...prev, [col.id]: 10 }))}
+                    <button
+                      className="w-full text-[11px] font-medium text-slate-500 hover:text-slate-700 py-1.5 rounded-xl hover:bg-slate-100 transition-colors"
+                      onClick={() => setColumnLimits((p) => ({ ...p, [col.id]: 10 }))}
                     >
-                      Show Less (Collapse)
-                    </Button>
+                      Show less
+                    </button>
                   )}
                 </>
               )}

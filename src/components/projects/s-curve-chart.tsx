@@ -5,15 +5,24 @@ import { useState, useEffect } from "react";
 import { ResponsiveContainer, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend } from "recharts";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { User, Users } from "lucide-react";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { SCurveDataPoint, SCurveDailyPoint, SCurveGroup } from "@/lib/s-curve";
 
 interface SCurveChartProps {
   sCurveGroup: SCurveGroup;
+  personalSCurveGroup?: SCurveGroup;
+  userRole: "admin" | "pm" | "developer" | "qa";
+  projectDevelopers: { id: string; name: string }[];
+  projectId: string;
 }
 
 interface CustomTooltipProps {
   active?: boolean;
   payload?: Array<{
+    name: string;
+    value: number;
+    color: string;
     payload: {
       day?: string;
       date?: string;
@@ -23,6 +32,10 @@ interface CustomTooltipProps {
       targetMilestone?: string | null;
       plannedCumulative: number;
       actualCumulative: number | null;
+      devPlannedCumulative?: number;
+      devActualCumulative?: number | null;
+      devRelativePlannedCumulative?: number;
+      devRelativeActualCumulative?: number | null;
       completedTasks?: Array<{
         id: string;
         taskCode?: string | null;
@@ -47,8 +60,6 @@ const CustomTooltip = ({ active, payload, view }: CustomTooltipProps) => {
       ? null
       : payload[0].payload.targetMilestone;
 
-    const plannedCumulative = payload[0].payload.plannedCumulative;
-    const actualCumulative = payload[0].payload.actualCumulative;
     const completedTasks = payload[0].payload.completedTasks || [];
 
     return (
@@ -61,16 +72,12 @@ const CustomTooltip = ({ active, payload, view }: CustomTooltipProps) => {
           )}
         </div>
         <div className="border-t border-slate-800/80 pt-2 space-y-1">
-          <div className="text-blue-400 flex justify-between gap-4 text-[11px] font-medium">
-            <span>Planned:</span>
-            <span className="font-bold">{(plannedCumulative * 100).toFixed(1)}%</span>
-          </div>
-          {actualCumulative !== null && (
-            <div className="text-emerald-400 flex justify-between gap-4 text-[11px] font-medium">
-              <span>Actual:</span>
-              <span className="font-bold">{(actualCumulative * 100).toFixed(1)}%</span>
+          {payload.map((item, idx) => (
+            <div key={idx} style={{ color: item.color }} className="flex justify-between gap-4 text-[11px] font-medium">
+              <span>{item.name}:</span>
+              <span className="font-bold">{(item.value * 100).toFixed(1)}%</span>
             </div>
-          )}
+          ))}
         </div>
 
         {completedTasks.length > 0 && (
@@ -114,48 +121,124 @@ const CustomTooltip = ({ active, payload, view }: CustomTooltipProps) => {
   return null;
 };
 
-export function SCurveChart({ sCurveGroup }: SCurveChartProps) {
-  const [view, setView] = useState<"weekly" | "monthly" | "overall">("overall");
+export function SCurveChart({ 
+  sCurveGroup, 
+  personalSCurveGroup, 
+  userRole, 
+  projectDevelopers, 
+  projectId 
+}: SCurveChartProps) {
+  const [view, setView] = useState<"weekly" | "monthly" | "overall" >("overall");
+  const [mode, setMode] = useState<"global" | "user">("global");
+  const [individualMode, setIndividualMode] = useState<"dynamic" | "relative">("dynamic");
+  const [selectedDeveloperId, setSelectedDeveloperId] = useState<string>("");
+  const [fetchedSCurveGroup, setFetchedSCurveGroup] = useState<SCurveGroup | null>(null);
+  const [loading, setLoading] = useState(false);
   const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
     setMounted(true);
   }, []);
 
+  // Initialize selected developer for Admin/PM
+  useEffect(() => {
+    if ((userRole === "admin" || userRole === "pm") && projectDevelopers.length > 0 && !selectedDeveloperId) {
+      setSelectedDeveloperId(projectDevelopers[0].id);
+    }
+  }, [projectDevelopers, userRole, selectedDeveloperId]);
+
+  // Fetch developer S-curve dynamically when Admin/PM changes the selected developer
+  useEffect(() => {
+    if (mode === "user" && selectedDeveloperId && (userRole === "admin" || userRole === "pm")) {
+      const fetchUserData = async () => {
+        setLoading(true);
+        try {
+          const res = await fetch(`/api/projects/${projectId}/s-curve?developerId=${selectedDeveloperId}`);
+          if (res.ok) {
+            const data = await res.json();
+            setFetchedSCurveGroup(data);
+          }
+        } catch (err) {
+          console.error("Error fetching developer S-curve:", err);
+        } finally {
+          setLoading(false);
+        }
+      };
+      fetchUserData();
+    }
+  }, [mode, selectedDeveloperId, userRole, projectId]);
 
   // Format percentage helper
   const formatPercent = (value: number) => `${Math.round(value * 100)}%`;
 
-  // Find latest actual progress and calculate deviance
-  let currentActual = 0;
-  let currentPlanned = 0;
+  // Get active dataset
+  const activeGroup = (mode === "global")
+    ? sCurveGroup
+    : (userRole === "developer" ? personalSCurveGroup : fetchedSCurveGroup) || sCurveGroup;
 
-  if (view === "weekly") {
-    const completedDays = sCurveGroup.weekly.days.filter((d) => d.actualCumulative !== null);
-    const lastCompleted = completedDays[completedDays.length - 1];
-    currentActual = (lastCompleted && lastCompleted.actualCumulative !== null) ? lastCompleted.actualCumulative : 0;
-    currentPlanned = lastCompleted ? lastCompleted.plannedCumulative : 0;
-  } else if (view === "monthly") {
-    const completedWeeks = sCurveGroup.monthly.weeks.filter((d) => d.actualCumulative !== null);
-    const lastCompleted = completedWeeks[completedWeeks.length - 1];
-    currentActual = (lastCompleted && lastCompleted.actualCumulative !== null) ? lastCompleted.actualCumulative : 0;
-    currentPlanned = lastCompleted ? lastCompleted.plannedCumulative : 0;
-  } else {
-    const completedWeeks = sCurveGroup.overall.filter((d) => d.actualCumulative !== null);
-    const lastCompleted = completedWeeks[completedWeeks.length - 1];
-    currentActual = (lastCompleted && lastCompleted.actualCumulative !== null) ? lastCompleted.actualCumulative : 0;
-    currentPlanned = lastCompleted ? lastCompleted.plannedCumulative : 0;
-  }
+  // Calculate deviance based on current active curve and mode
+  const getDevianceInput = () => {
+    let completedPoints: any[] = [];
+    if (view === "weekly") {
+      completedPoints = activeGroup.weekly.days.filter((d) => {
+        if (mode === "user" && individualMode === "dynamic") {
+          return d.devActualCumulative !== null;
+        } else if (mode === "user" && individualMode === "relative") {
+          return d.devRelativeActualCumulative !== null;
+        }
+        return d.actualCumulative !== null;
+      });
+    } else if (view === "monthly") {
+      completedPoints = activeGroup.monthly.weeks.filter((d) => {
+        if (mode === "user" && individualMode === "dynamic") {
+          return d.devActualCumulative !== null;
+        } else if (mode === "user" && individualMode === "relative") {
+          return d.devRelativeActualCumulative !== null;
+        }
+        return d.actualCumulative !== null;
+      });
+    } else {
+      completedPoints = activeGroup.overall.filter((d) => {
+        if (mode === "user" && individualMode === "dynamic") {
+          return d.devActualCumulative !== null;
+        } else if (mode === "user" && individualMode === "relative") {
+          return d.devRelativeActualCumulative !== null;
+        }
+        return d.actualCumulative !== null;
+      });
+    }
 
+    const lastCompleted = completedPoints[completedPoints.length - 1];
+    if (!lastCompleted) return { actual: 0, planned: 0 };
+
+    if (mode === "user" && individualMode === "dynamic") {
+      return {
+        actual: lastCompleted.devActualCumulative ?? 0,
+        planned: lastCompleted.devPlannedCumulative ?? 0
+      };
+    } else if (mode === "user" && individualMode === "relative") {
+      return {
+        actual: lastCompleted.devRelativeActualCumulative ?? 0,
+        planned: lastCompleted.devRelativePlannedCumulative ?? 0
+      };
+    } else {
+      return {
+        actual: lastCompleted.actualCumulative ?? 0,
+        planned: lastCompleted.plannedCumulative ?? 0
+      };
+    }
+  };
+
+  const { actual: currentActual, planned: currentPlanned } = getDevianceInput();
   const deviance = (currentActual - currentPlanned) * 100;
 
   // Configure chart props based on selected view
   const chartData = (
     view === "weekly"
-      ? sCurveGroup.weekly.days
+      ? activeGroup.weekly.days
       : view === "monthly"
-      ? sCurveGroup.monthly.weeks
-      : sCurveGroup.overall
+      ? activeGroup.monthly.weeks
+      : activeGroup.overall
   ) as (SCurveDataPoint | SCurveDailyPoint)[];
 
   const xAxisKey = view === "weekly" ? "day" : "week";
@@ -183,16 +266,30 @@ export function SCurveChart({ sCurveGroup }: SCurveChartProps) {
 
   return (
     <Card className="col-span-1 lg:col-span-3 shadow-md border-slate-200 overflow-visible">
-      <CardHeader className="flex flex-row items-center justify-between pb-2">
+      <CardHeader className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-4">
         <div className="space-y-1">
-          <CardTitle className="text-base font-bold">Project S-Curve Tracking</CardTitle>
+          <CardTitle className="text-base font-bold flex items-center gap-2">
+            <span>S-Curve Progress Tracking</span>
+            {loading && <span className="text-[10px] font-normal text-slate-400 animate-pulse">(fetching...)</span>}
+          </CardTitle>
           <CardDescription className="text-xs">
-            {view === "weekly" && `Daily Trace for Week ${sCurveGroup.weekly.weekNumber}`}
-            {view === "monthly" && `Weekly Trace for ${sCurveGroup.monthly.monthName}`}
-            {view === "overall" && `Cumulative Progress over ${sCurveGroup.overall.length} Weeks`}
+            {mode === "global" && (
+              <>
+                {view === "weekly" && `Daily Trace for Week ${activeGroup.weekly.weekNumber}`}
+                {view === "monthly" && `Weekly Trace for ${activeGroup.monthly.monthName}`}
+                {view === "overall" && `Cumulative Progress over ${activeGroup.overall.length} Weeks`}
+              </>
+            )}
+            {mode === "user" && (
+              <>
+                Developer Progress: {individualMode === "dynamic" ? "Self-Target (Dinamis)" : "Project Contribution (Relatif)"}
+              </>
+            )}
           </CardDescription>
         </div>
-        <div className="flex items-center gap-2">
+
+        {/* Action Controls */}
+        <div className="flex flex-wrap items-center gap-2.5">
           {/* Deviance Badge */}
           {deviance < 0 ? (
             <Badge variant="destructive" className="px-2 py-0.5 text-[10px]">
@@ -204,8 +301,85 @@ export function SCurveChart({ sCurveGroup }: SCurveChartProps) {
             </Badge>
           )}
 
-          {/* Segment Toggle */}
-          <div className="flex bg-slate-100 p-0.5 rounded-lg border border-slate-200 ml-2">
+          {/* Mode Selector Toggle (1 Person vs Group Icon) */}
+          <div className="flex bg-slate-100 p-0.5 rounded-lg border border-slate-200">
+            <button
+              onClick={() => setMode("global")}
+              className={`p-1 px-2.5 rounded-md transition-all flex items-center gap-1.5 text-xs font-semibold ${
+                mode === "global"
+                  ? "bg-white text-slate-800 shadow-sm"
+                  : "text-slate-500 hover:text-slate-800"
+              }`}
+              title="Global Project S-Curve"
+            >
+              <Users className="w-3.5 h-3.5" />
+              <span className="hidden sm:inline">Global</span>
+            </button>
+            <button
+              onClick={() => setMode("user")}
+              className={`p-1 px-2.5 rounded-md transition-all flex items-center gap-1.5 text-xs font-semibold ${
+                mode === "user"
+                  ? "bg-white text-slate-800 shadow-sm"
+                  : "text-slate-500 hover:text-slate-800"
+              }`}
+              title="Developer S-Curve"
+            >
+              <User className="w-3.5 h-3.5" />
+              <span className="hidden sm:inline">{userRole === "developer" ? "My Curve" : "Developer"}</span>
+            </button>
+          </div>
+
+          {/* Admin Developer Filter Dropdown */}
+          {mode === "user" && (userRole === "admin" || userRole === "pm") && projectDevelopers.length > 0 && (
+            <Select
+              value={selectedDeveloperId}
+              onValueChange={(val) => setSelectedDeveloperId(val || "")}
+            >
+              <SelectTrigger className="h-8 text-xs font-semibold w-40 bg-white border border-slate-200 shadow-sm">
+                <SelectValue placeholder="Select Developer">
+                  {projectDevelopers.find((dev) => dev.id === selectedDeveloperId)?.name}
+                </SelectValue>
+              </SelectTrigger>
+              <SelectContent>
+                {projectDevelopers.map((dev) => (
+                  <SelectItem key={dev.id} value={dev.id} className="text-xs">
+                    {dev.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          )}
+
+          {/* Individual Mode Sub-Toggle (Dinamis vs Relatif) */}
+          {mode === "user" && (
+            <div className="flex bg-slate-100 p-0.5 rounded-lg border border-slate-200">
+              <button
+                onClick={() => setIndividualMode("dynamic")}
+                className={`text-[10px] px-2.5 py-1 font-semibold rounded-md transition-all ${
+                  individualMode === "dynamic"
+                    ? "bg-white text-slate-800 shadow-sm"
+                    : "text-slate-500 hover:text-slate-800"
+                }`}
+                title="Personal dynamic target based on assigned tasks"
+              >
+                Dinamis
+              </button>
+              <button
+                onClick={() => setIndividualMode("relative")}
+                className={`text-[10px] px-2.5 py-1 font-semibold rounded-md transition-all ${
+                  individualMode === "relative"
+                    ? "bg-white text-slate-800 shadow-sm"
+                    : "text-slate-500 hover:text-slate-800"
+                }`}
+                title="Contribution relative to overall project progress"
+              >
+                Relatif
+              </button>
+            </div>
+          )}
+
+          {/* Timeframe Selector Segment Toggle */}
+          <div className="flex bg-slate-100 p-0.5 rounded-lg border border-slate-200">
             {(["weekly", "monthly", "overall"] as const).map((v) => (
               <button
                 key={v}
@@ -229,42 +403,122 @@ export function SCurveChart({ sCurveGroup }: SCurveChartProps) {
           }
         ` }} />
         <div className="w-full h-[260px] overflow-visible">
-          <ResponsiveContainer width="100%" height="100%">
-            <LineChart data={chartData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
-              <CartesianGrid strokeDasharray="3 3" className="stroke-slate-100" />
-              <XAxis
-                dataKey={xAxisKey}
-                tickFormatter={tickFormatter}
-                tick={{ fontSize: 11, fill: "#64748b" }}
-              />
-              <YAxis
-                tickFormatter={formatPercent}
-                tick={{ fontSize: 11, fill: "#64748b" }}
-                domain={[0, 1]}
-              />
-              <Tooltip content={<CustomTooltip view={view} />} allowEscapeViewBox={{ x: true, y: true }} />
-              <Legend verticalAlign="top" height={36} />
-              <Line
-                name="Planned Progress"
-                type="monotone"
-                dataKey="plannedCumulative"
-                stroke="#3b82f6"
-                strokeWidth={3}
-                dot={view === "weekly" || view === "monthly"}
-                activeDot={{ r: 6 }}
-              />
-              <Line
-                name="Actual Progress"
-                type="monotone"
-                dataKey="actualCumulative"
-                stroke="#10b981"
-                strokeWidth={3}
-                dot={{ r: 3, fill: "#10b981" }}
-                activeDot={{ r: 6 }}
-                connectNulls={false}
-              />
-            </LineChart>
-          </ResponsiveContainer>
+          {loading ? (
+            <div className="w-full h-full flex items-center justify-center text-xs text-slate-400">
+              Fetching developer S-curve data...
+            </div>
+          ) : (
+            <ResponsiveContainer width="100%" height="100%">
+              <LineChart data={chartData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+                <CartesianGrid strokeDasharray="3 3" className="stroke-slate-100" />
+                <XAxis
+                  dataKey={xAxisKey}
+                  tickFormatter={tickFormatter}
+                  tick={{ fontSize: 11, fill: "#64748b" }}
+                />
+                <YAxis
+                  tickFormatter={formatPercent}
+                  tick={{ fontSize: 11, fill: "#64748b" }}
+                  domain={[0, 1]}
+                />
+                <Tooltip content={<CustomTooltip view={view} />} allowEscapeViewBox={{ x: true, y: true }} />
+                <Legend verticalAlign="top" height={36} />
+
+                {/* GLOBAL MODE LINES */}
+                {mode === "global" && (
+                  <>
+                    <Line
+                      name="Planned Progress"
+                      type="monotone"
+                      dataKey="plannedCumulative"
+                      stroke="#3b82f6"
+                      strokeWidth={3}
+                      dot={view === "weekly" || view === "monthly"}
+                      activeDot={{ r: 6 }}
+                    />
+                    <Line
+                      name="Actual Progress"
+                      type="monotone"
+                      dataKey="actualCumulative"
+                      stroke="#10b981"
+                      strokeWidth={3}
+                      dot={{ r: 3, fill: "#10b981" }}
+                      activeDot={{ r: 6 }}
+                      connectNulls={false}
+                    />
+                  </>
+                )}
+
+                {/* USER DYNAMIC MODE LINES */}
+                {mode === "user" && individualMode === "dynamic" && (
+                  <>
+                    <Line
+                      name="Target (Dinamis)"
+                      type="monotone"
+                      dataKey="devPlannedCumulative"
+                      stroke="#8b5cf6"
+                      strokeWidth={3}
+                      dot={view === "weekly" || view === "monthly"}
+                      activeDot={{ r: 6 }}
+                    />
+                    <Line
+                      name="Actual Progress (Dinamis)"
+                      type="monotone"
+                      dataKey="devActualCumulative"
+                      stroke="#ec4899"
+                      strokeWidth={3}
+                      dot={{ r: 3, fill: "#ec4899" }}
+                      activeDot={{ r: 6 }}
+                      connectNulls={false}
+                    />
+                  </>
+                )}
+
+                {/* USER RELATIVE MODE LINES */}
+                {mode === "user" && individualMode === "relative" && (
+                  <>
+                    <Line
+                      name="Project Target"
+                      type="monotone"
+                      dataKey="plannedCumulative"
+                      stroke="#3b82f6"
+                      strokeWidth={2}
+                      strokeDasharray="5 5"
+                      dot={false}
+                    />
+                    <Line
+                      name="Project Actual"
+                      type="monotone"
+                      dataKey="actualCumulative"
+                      stroke="#10b981"
+                      strokeWidth={2}
+                      strokeDasharray="5 5"
+                      dot={false}
+                    />
+                    <Line
+                      name="My Contribution Target"
+                      type="monotone"
+                      dataKey="devRelativePlannedCumulative"
+                      stroke="#8b5cf6"
+                      strokeWidth={3}
+                      dot={view === "weekly" || view === "monthly"}
+                      activeDot={{ r: 6 }}
+                    />
+                    <Line
+                      name="My Contribution Actual"
+                      type="monotone"
+                      dataKey="devRelativeActualCumulative"
+                      stroke="#ec4899"
+                      strokeWidth={3}
+                      dot={{ r: 3, fill: "#ec4899" }}
+                      activeDot={{ r: 6 }}
+                      connectNulls={false}
+                    />
+                  </>
+                )}
+              </LineChart>
+            </ResponsiveContainer>
+          )}
         </div>
       </CardContent>
     </Card>

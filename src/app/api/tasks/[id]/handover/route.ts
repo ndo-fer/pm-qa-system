@@ -6,7 +6,8 @@ import { tasks, taskContributors, taskActivities, notifications, users, projectM
 import { eq, and } from "drizzle-orm";
 import { randomUUID } from "crypto";
 import { z } from "zod";
-import { sendWhatsAppNotification, formatBlockerAlert } from "@/lib/wa";
+import { formatBlockerAlert } from "@/lib/wa";
+import { NotificationService } from "@/lib/notification-service";
 
 const handoverBodySchema = z.object({
   targetUserId: z.string().min(1),
@@ -118,61 +119,50 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
         note: note || "",
       });
 
-      // 7. Create in-app notification for the target user
-      const title = noticeType === "handover_notice" ? "Serah Terima Tugas" : "Notifikasi Blocker";
-      const message = noticeType === "handover_notice"
-        ? `${senderName} menyerahkan tugas "${task[0].title}" kepada Anda.${note ? ` Catatan: ${note}` : ""}`
-        : `${senderName} terhambat oleh Anda pada tugas "${task[0].title}".${note ? ` Catatan: ${note}` : ""}`;
-
-      await tx.insert(notifications).values({
-        id: randomUUID(),
-        recipientId: targetUserId,
-        senderId: session.user.id,
+      // 7. Create in-app notifications using NotificationService
+      await NotificationService.createHandoverNotifications({
+        tx,
         taskId,
-        title,
-        message,
-        isRead: false,
+        taskTitle: task[0].title,
+        senderId: session.user.id,
+        senderName,
+        targetUserId,
+        targetName,
+        noticeType,
+        note: note || undefined,
       });
-
-      // 8. Create in-app notifications for all Admin users in a single bulk operation
-      const admins = await tx.select().from(users).where(eq(users.role, "admin"));
-      const adminNotifs = admins
-        .filter((admin) => admin.id !== session.user.id && admin.id !== targetUserId)
-        .map((admin) => ({
-          id: randomUUID(),
-          recipientId: admin.id,
-          senderId: session.user.id,
-          taskId,
-          title: `[ADMIN ALERT] ${title}`,
-          message: `${senderName} menyerahkan/menghambat tugas "${task[0].title}" ke ${targetName}.${note ? ` Catatan: ${note}` : ""}`,
-          isRead: false,
-        }));
-
-      if (adminNotifs.length > 0) {
-        await tx.insert(notifications).values(adminNotifs);
-      }
     });
 
     // Send automated WhatsApp message after transaction commits successfully, if it's an urgent/high priority blocker
     if (noticeType === "blocker_notice" && (task[0].priority === "high" || task[0].priority === "urgent")) {
-      try {
-        const waMessage = formatBlockerAlert({
-          recipientName: targetName,
-          senderName,
-          taskCode: task[0].taskCode || "PM-TASK",
-          taskTitle: task[0].title,
-          featureName: task[0].feature || "Umum",
-          moduleName: task[0].phase || "Sistem",
-          priority: task[0].priority || "medium",
-          blockerNote: note || "",
-          dueDate: task[0].dueDate || undefined,
-        });
-        await sendWhatsAppNotification({
-          recipientId: targetUserId,
-          message: waMessage,
-        });
-      } catch (err) {
-        console.error("Auto WhatsApp blocker alert failed:", err);
+      const recipientPhone = targetUser.length > 0 ? targetUser[0].phone : null;
+      if (!recipientPhone) {
+        console.warn(`[API HANDOVER WARNING] Auto WhatsApp not sent: target user ${targetName} (${targetUserId}) does not have a phone number.`);
+      } else {
+        const isThrottled = await NotificationService.isThrottled(taskId, targetUserId);
+        if (isThrottled) {
+          console.log(`[API HANDOVER] Automated WhatsApp alert throttled for task ${taskId} to user ${targetUserId}`);
+        } else {
+          try {
+            const waMessage = formatBlockerAlert({
+              recipientName: targetName,
+              senderName,
+              taskCode: task[0].taskCode || "PM-TASK",
+              taskTitle: task[0].title,
+              featureName: task[0].feature || "Umum",
+              moduleName: task[0].phase || "Sistem",
+              priority: task[0].priority || "medium",
+              blockerNote: note || "",
+              dueDate: task[0].dueDate || undefined,
+            });
+            await NotificationService.sendWhatsAppWithAudit({
+              recipientId: targetUserId,
+              message: waMessage,
+            });
+          } catch (err) {
+            console.error("Auto WhatsApp blocker alert failed:", err);
+          }
+        }
       }
     }
 
