@@ -6,6 +6,7 @@ import { tasks, NewTask, projectMembers, projects, taskContributors, users, noti
 import { eq, and, desc, inArray } from "drizzle-orm";
 import { randomUUID } from "crypto";
 import { z } from "zod";
+import { hasPermission } from "@/lib/permissions";
 
 const taskCreateSchema = z.object({
   title: z.string().min(1, "Title is required"),
@@ -144,18 +145,13 @@ export async function POST(request: Request) {
   if (member.length === 0) return NextResponse.json({ error: "Access denied" }, { status: 403 });
 
   // Role Validation:
-  // Admin & PM can create any tasks.
-  // Developer & QA can ONLY create tasks if they are bugs (epic or taskType is 'BUG' / 'bug').
-  const userRole = member[0].role;
-  if (userRole === "developer" || userRole === "qa") {
-    const isBug = 
-      String(validatedData.epic).toUpperCase() === "BUG" || 
-      String(validatedData.taskType).toUpperCase() === "BUG";
-    if (!isBug) {
-      return NextResponse.json({ 
-        error: "Forbidden: Developer and QA roles are only authorized to create bug reports." 
-      }, { status: 403 });
-    }
+  const canCreateTask = hasPermission(session.user.role, session.user.permissions, "tasks:create");
+  const isBug = String(validatedData.epic).toUpperCase() === "BUG" || String(validatedData.taskType).toUpperCase() === "BUG";
+  
+  if (!canCreateTask && !isBug) {
+    return NextResponse.json({ 
+      error: "Forbidden: You do not have permission to create tasks." 
+    }, { status: 403 });
   }
 
   const newTask: NewTask = {

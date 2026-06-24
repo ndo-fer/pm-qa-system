@@ -6,6 +6,7 @@ import { tasks, projectMembers, taskContributors, users, notifications } from "@
 import { eq, and } from "drizzle-orm";
 import { z } from "zod";
 import { randomUUID } from "crypto";
+import { hasPermission } from "@/lib/permissions";
 
 const taskUpdateSchema = z.object({
   title: z.string().min(1).optional(),
@@ -93,12 +94,16 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
     .limit(1);
   if (member.length === 0) return NextResponse.json({ error: "Access denied" }, { status: 403 });
 
-  const userRole = member[0].role;
-
   // Role Validation:
-  // Developers & QA can only edit: status, progress, assigneeId, screenshotUrl, blocker, description, acceptanceCriteria.
-  // If they edit admin fields and change their values, return 403 Forbidden.
-  if (userRole === "developer" || userRole === "qa") {
+  const canUpdateTask = hasPermission(session.user.role, session.user.permissions, "tasks:update");
+  const canDeleteTask = hasPermission(session.user.role, session.user.permissions, "tasks:delete");
+
+  if (!canUpdateTask) {
+    return NextResponse.json({ error: "Forbidden: You do not have permission to update tasks." }, { status: 403 });
+  }
+
+  // If user doesn't have "tasks:delete" (used as an admin proxy), they can only edit specific fields.
+  if (!canDeleteTask) {
     const adminFields: Array<keyof typeof validatedData> = [
       "title",
       "priority",
@@ -119,7 +124,7 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
     for (const field of adminFields) {
       if (validatedData[field] !== undefined && validatedData[field] !== existing[0][field as keyof typeof tasks.$inferSelect]) {
         return NextResponse.json({
-          error: `Forbidden: User with role '${userRole}' is not authorized to edit field '${field}'.`
+          error: `Forbidden: You do not have admin permissions to edit field '${field}'.`
         }, { status: 403 });
       }
     }
@@ -265,9 +270,9 @@ export async function DELETE(request: Request, { params }: { params: Promise<{ i
     .limit(1);
   if (member.length === 0) return NextResponse.json({ error: "Access denied" }, { status: 403 });
 
-  const userRole = member[0].role;
-  if (userRole !== "admin" && userRole !== "pm") {
-    return NextResponse.json({ error: "Forbidden: Only Admin and Project Manager roles can delete tasks." }, { status: 403 });
+  const canDeleteTask = hasPermission(session.user.role, session.user.permissions, "tasks:delete");
+  if (!canDeleteTask) {
+    return NextResponse.json({ error: "Forbidden: You do not have permission to delete tasks." }, { status: 403 });
   }
 
   const existing = await db.select().from(tasks).where(and(eq(tasks.id, id), eq(tasks.projectId, session.user.projectId))).limit(1);
