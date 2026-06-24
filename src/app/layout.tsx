@@ -5,6 +5,7 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/auth";
 import { SessionProvider } from "@/components/session-provider";
 import NextTopLoader from "nextjs-toploader";
+import { Analytics } from "@vercel/analytics/next";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -46,6 +47,7 @@ export default async function RootLayout({
             shadow="0 0 10px #2563eb,0 0 5px #2563eb"
           />
           {children}
+          <Analytics />
         </SessionProvider>
       </body>
     </html>
